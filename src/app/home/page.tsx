@@ -25,7 +25,7 @@ export default function HomePage() {
   const [places, setPlaces] = useState<Place[]>([])
   const [currentIndex, setCurrentIndex] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
-  const [user, setUser] = useState<any>(null)
+  const [user, setUser] = useState<{ id: string; email?: string } | null>(null)
   const router = useRouter()
 
   useEffect(() => {

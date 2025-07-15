@@ -33,31 +33,9 @@ export default function ChatRoomPage() {
   const [messages, setMessages] = useState<Message[]>([])
   const [newMessage, setNewMessage] = useState('')
   const [chatRoom, setChatRoom] = useState<ChatRoom | null>(null)
-  const [user, setUser] = useState<any>(null)
+  const [user, setUser] = useState<{ id: string; email?: string } | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const messagesEndRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    const checkAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) {
-        router.push('/auth')
-        return
-      }
-      setUser(session.user)
-      fetchChatRoom(session.user.id)
-    }
-
-    checkAuth()
-  }, [params.id, router])
-
-  useEffect(() => {
-    scrollToBottom()
-  }, [messages])
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }
 
   const fetchChatRoom = async (userId: string) => {
     try {
@@ -121,6 +99,28 @@ export default function ChatRoomPage() {
     } finally {
       setIsLoading(false)
     }
+  }
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        router.push('/auth')
+        return
+      }
+      setUser(session.user)
+      fetchChatRoom(session.user.id)
+    }
+
+    checkAuth()
+  }, [params.id, router])
+
+  useEffect(() => {
+    scrollToBottom()
+  }, [messages])
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }
 
   const sendMessage = async () => {

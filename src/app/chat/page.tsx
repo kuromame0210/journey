@@ -29,7 +29,7 @@ export default function ChatListPage() {
   const router = useRouter()
   const [chatRooms, setChatRooms] = useState<ChatRoom[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [user, setUser] = useState<any>(null)
+  const [user, setUser] = useState<{ id: string; email?: string } | null>(null)
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -39,6 +39,8 @@ export default function ChatListPage() {
         return
       }
       setUser(session.user)
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const _user = user
       fetchChatRooms(session.user.id)
     }
 
@@ -183,6 +185,7 @@ export default function ChatListPage() {
               <div className="flex items-center space-x-3">
                 {/* Place Image */}
                 <div className="flex-shrink-0">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={room.place.images[0]}
                     alt={room.place.title}

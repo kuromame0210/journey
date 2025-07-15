@@ -29,7 +29,7 @@ interface Place {
 
 export default function ProfilePage() {
   const router = useRouter()
-  const [user, setUser] = useState<any>(null)
+  const [user, setUser] = useState<{ id: string; email?: string } | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [activeTab, setActiveTab] = useState<'posted' | 'liked' | 'kept' | 'passed'>('posted')
   const [places, setPlaces] = useState<Place[]>([])
@@ -283,7 +283,7 @@ export default function ProfilePage() {
             {Object.entries(tabLabels).map(([key, label]) => (
               <button
                 key={key}
-                onClick={() => handleTabChange(key as any)}
+                onClick={() => handleTabChange(key as 'liked' | 'kept' | 'posted' | 'passed')}
                 className={`flex-1 py-3 px-4 text-sm font-medium border-b-2 transition-colors ${
                   activeTab === key
                     ? 'border-blue-600 text-blue-600'

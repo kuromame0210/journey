@@ -30,7 +30,7 @@ const demandTags = [
 
 export default function ProfileEditPage() {
   const router = useRouter()
-  const [user, setUser] = useState<any>(null)
+  const [user, setUser] = useState<{ id: string; email?: string } | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   
   const [formData, setFormData] = useState({
@@ -98,7 +98,7 @@ export default function ProfileEditPage() {
     }
   }
 
-  const handleInputChange = (field: string, value: any) => {
+  const handleInputChange = (field: string, value: string | number | number[]) => {
     setFormData(prev => ({ ...prev, [field]: value }))
   }
 

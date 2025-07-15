@@ -30,7 +30,7 @@ const demandTags = [
 
 export default function PlaceCreatePage() {
   const router = useRouter()
-  const [user, setUser] = useState<any>(null)
+  const [user, setUser] = useState<{ id: string; email?: string } | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [images, setImages] = useState<string[]>([])
   
@@ -64,7 +64,7 @@ export default function PlaceCreatePage() {
     checkAuth()
   }, [router])
 
-  const handleInputChange = (field: string, value: any) => {
+  const handleInputChange = (field: string, value: string | number | number[]) => {
     setFormData(prev => ({ ...prev, [field]: value }))
   }
 
