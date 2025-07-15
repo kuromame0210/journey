@@ -39,61 +39,26 @@ export default function ChatRoomPage() {
 
   const fetchChatRoom = async (userId: string) => {
     try {
-      // Mock data for demonstration
-      const mockRoom: ChatRoom = {
-        id: params.id as string,
-        place_id: 'place1',
-        place: {
-          title: '京都の清水寺',
-          date_start: '2024-04-01',
-          date_end: '2024-04-03'
-        },
-        other_user: {
-          id: 'other1',
-          name: '田中太郎'
-        }
-      }
-
-      const mockMessages: Message[] = [
-        {
-          id: '1',
-          room_id: params.id as string,
-          sender: 'other1',
-          body: 'こんにちは！京都旅行の件でご連絡させていただきました。',
-          sent_at: new Date(Date.now() - 86400000).toISOString()
-        },
-        {
-          id: '2',
-          room_id: params.id as string,
-          sender: userId,
-          body: 'こんにちは！こちらこそよろしくお願いします。',
-          sent_at: new Date(Date.now() - 82800000).toISOString()
-        },
-        {
-          id: '3',
-          room_id: params.id as string,
-          sender: 'other1',
-          body: '清水寺は朝早く行くと人が少なくて写真撮影にいいですよ！',
-          sent_at: new Date(Date.now() - 79200000).toISOString()
-        },
-        {
-          id: '4',
-          room_id: params.id as string,
-          sender: userId,
-          body: 'それは良い情報ですね！朝6時くらいでも大丈夫でしょうか？',
-          sent_at: new Date(Date.now() - 75600000).toISOString()
-        },
-        {
-          id: '5',
-          room_id: params.id as string,
-          sender: 'other1',
-          body: '全然大丈夫です！6時に清水寺の入り口で待ち合わせましょう。',
-          sent_at: new Date(Date.now() - 3600000).toISOString()
-        }
-      ]
-
-      setChatRoom(mockRoom)
-      setMessages(mockMessages)
+      const { data: roomData, error: roomError } = await supabase
+        .from('chat_rooms')
+        .select(`
+          *,
+          places(*)
+        `)
+        .eq('id', params.id)
+        .single()
+      
+      if (roomError) throw roomError
+      setChatRoom(roomData)
+      
+      const { data: messagesData, error: messagesError } = await supabase
+        .from('messages')
+        .select('*')
+        .eq('room_id', params.id)
+        .order('sent_at', { ascending: true })
+      
+      if (messagesError) throw messagesError
+      setMessages(messagesData || [])
     } catch (error) {
       console.error('Error fetching chat room:', error)
     } finally {

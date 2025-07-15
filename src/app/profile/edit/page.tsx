@@ -175,7 +175,7 @@ export default function ProfileEditPage() {
             value={formData.name}
             onChange={(e) => handleInputChange('name', e.target.value)}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-            placeholder="例: 山田太郎"
+            placeholder="お名前を入力"
           />
         </div>
 
@@ -218,7 +218,7 @@ export default function ProfileEditPage() {
             value={formData.age}
             onChange={(e) => handleInputChange('age', e.target.value)}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-            placeholder="例: 25"
+            placeholder="年齢を入力"
           />
         </div>
 
@@ -259,7 +259,7 @@ export default function ProfileEditPage() {
             value={formData.mbti}
             onChange={(e) => handleInputChange('mbti', e.target.value)}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-            placeholder="例: ENFP"
+            placeholder="MBTIタイプを入力"
             maxLength={4}
           />
         </div>

@@ -79,7 +79,8 @@ export default function PlaceCreatePage() {
 
   const handleImageAdd = () => {
     if (images.length < 5) {
-      setImages([...images, `https://via.placeholder.com/400x300?text=Image+${images.length + 1}`])
+      // TODO: Implement image upload functionality
+      alert('画像アップロード機能は後で実装予定です')
     }
   }
 
@@ -189,7 +190,7 @@ export default function PlaceCreatePage() {
             value={formData.title}
             onChange={(e) => handleInputChange('title', e.target.value)}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-            placeholder="例: 京都の清水寺"
+            placeholder="行きたい場所の名前を入力"
           />
         </div>
 
@@ -204,7 +205,7 @@ export default function PlaceCreatePage() {
             value={formData.genre}
             onChange={(e) => handleInputChange('genre', e.target.value)}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-            placeholder="例: 観光地、レストラン、アクティビティ"
+            placeholder="ジャンルを入力"
           />
         </div>
 

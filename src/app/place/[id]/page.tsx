@@ -34,33 +34,25 @@ export default function PlaceDetailPage() {
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
 
   const fetchPlace = async () => {
-    // In a real app, you'd fetch from Supabase here
-    const mockPlace: Place = {
-      id: params.id as string,
-      title: '京都の清水寺',
-      images: [
-        'https://images.unsplash.com/photo-1545569341-9eb8b30979d9?w=400',
-        'https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?w=400',
-        'https://images.unsplash.com/photo-1480796927426-f609979314bd?w=400'
-      ],
-      genre: '歴史・文化',
-      purpose_tags: [1, 3],
-      demand_tags: [2, 4],
-      budget_option: 5,
-      purpose_text: '京都の美しい伝統建築を一緒に観光しませんか？特に清水寺の舞台からの景色は絶景です。朝早く行けば人も少なく、素晴らしい写真が撮れます。',
-      budget_min: 3000,
-      budget_max: 8000,
-      date_start: '2024-04-15',
-      date_end: '2024-04-17',
-      recruit_num: 3,
-      first_choice: '清水寺',
-      second_choice: '金閣寺',
-      gmap_url: 'https://maps.google.com/example',
-      owner: 'owner123'
+    try {
+      const { data, error } = await supabase
+        .from('places')
+        .select('*')
+        .eq('id', params.id)
+        .single()
+
+      if (error) {
+        console.error('Error fetching place:', error)
+        setPlace(null)
+      } else {
+        setPlace(data)
+      }
+    } catch (error) {
+      console.error('Error fetching place:', error)
+      setPlace(null)
+    } finally {
+      setIsLoading(false)
     }
-    
-    setPlace(mockPlace)
-    setIsLoading(false)
   }
 
   useEffect(() => {
@@ -168,7 +160,7 @@ export default function PlaceDetailPage() {
 
           {/* Match percentage */}
           <div className="absolute top-4 right-4 bg-white/90 px-3 py-1 rounded-full">
-            <span className="text-sm font-bold text-gray-800">75%</span>
+            <span className="text-sm font-bold text-gray-800">--%</span>
           </div>
         </div>
       </div>

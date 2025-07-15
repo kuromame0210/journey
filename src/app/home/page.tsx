@@ -56,6 +56,7 @@ export default function HomePage() {
       setPlaces(data || [])
     } catch (error) {
       console.error('Error fetching places:', error)
+      setPlaces([])
     } finally {
       setIsLoading(false)
     }
@@ -174,7 +175,7 @@ export default function HomePage() {
             
             {/* Match percentage */}
             <div className="absolute top-4 right-4 bg-white/90 px-3 py-1 rounded-full">
-              <span className="text-sm font-bold text-gray-800">75%</span>
+              <span className="text-sm font-bold text-gray-800">--%</span>
             </div>
           </div>
 
@@ -187,14 +188,9 @@ export default function HomePage() {
               {currentPlace.genre || 'ジャンル未設定'}
             </p>
             
-            {/* Tags */}
+            {/* Tags - will be populated from database */}
             <div className="flex flex-wrap gap-2 mb-4">
-              <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs">
-                予算帯: 中
-              </span>
-              <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">
-                観光
-              </span>
+              {/* Dynamic tags will be rendered here */}
             </div>
 
             {/* Date */}

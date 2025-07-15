@@ -52,23 +52,21 @@ export default function ProfilePage() {
 
   const fetchProfile = async (userId: string) => {
     try {
-      // Mock profile data
-      const mockProfile: Profile = {
-        id: userId,
-        name: '山田太郎',
-        gender: 'male',
-        age: 28,
-        partner_gender: 'either',
-        must_condition: '一緒に楽しく旅行できる方を探しています！写真撮影が好きで、美味しいものを食べるのも大好きです。',
-        mbti: 'ENFP',
-        budget_pref: [1, 2],
-        purpose_tags: [1, 2, 3],
-        demand_tags: [1, 2]
-      }
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single()
 
-      setProfile(mockProfile)
+      if (error) {
+        console.log('Profile not found, user needs to create one')
+        setProfile(null)
+      } else {
+        setProfile(data)
+      }
     } catch (error) {
       console.error('Error fetching profile:', error)
+      setProfile(null)
     } finally {
       setIsLoading(false)
     }
@@ -76,51 +74,36 @@ export default function ProfilePage() {
 
   const fetchPlaces = async (userId: string, type: 'posted' | 'liked' | 'kept' | 'passed') => {
     try {
-      // Mock places data based on tab
-      let mockPlaces: Place[] = []
-
+      let query = supabase.from('places').select('*')
+      
       if (type === 'posted') {
-        mockPlaces = [
-          {
-            id: '1',
-            title: '京都の清水寺',
-            images: ['https://via.placeholder.com/300x200?text=Kyoto'],
-            genre: '観光地',
-            created_at: new Date().toISOString()
-          },
-          {
-            id: '2',
-            title: '沖縄の美ら海水族館',
-            images: ['https://via.placeholder.com/300x200?text=Okinawa'],
-            genre: '水族館',
-            created_at: new Date().toISOString()
-          }
-        ]
-      } else if (type === 'liked') {
-        mockPlaces = [
-          {
-            id: '3',
-            title: '北海道のラベンダー畑',
-            images: ['https://via.placeholder.com/300x200?text=Hokkaido'],
-            genre: '自然',
-            created_at: new Date().toISOString()
-          }
-        ]
-      } else if (type === 'kept') {
-        mockPlaces = [
-          {
-            id: '4',
-            title: '富士山五合目',
-            images: ['https://via.placeholder.com/300x200?text=Fuji'],
-            genre: '登山',
-            created_at: new Date().toISOString()
-          }
-        ]
+        query = query.eq('owner', userId)
+      } else {
+        // For reactions, we'd need to join with reactions table
+        const { data: reactionData, error: reactionError } = await supabase
+          .from('reactions')
+          .select('place_id')
+          .eq('from_uid', userId)
+          .eq('type', type === 'liked' ? 'like' : type === 'kept' ? 'keep' : 'pass')
+        
+        if (reactionError) throw reactionError
+        
+        const placeIds = reactionData?.map(r => r.place_id) || []
+        if (placeIds.length === 0) {
+          setPlaces([])
+          return
+        }
+        
+        query = query.in('id', placeIds)
       }
-
-      setPlaces(mockPlaces)
+      
+      const { data, error } = await query.order('created_at', { ascending: false })
+      
+      if (error) throw error
+      setPlaces(data || [])
     } catch (error) {
       console.error('Error fetching places:', error)
+      setPlaces([])
     }
   }
 
@@ -131,14 +114,8 @@ export default function ProfilePage() {
     }
   }
 
-  const handleSignOut = async () => {
-    try {
-      const { error } = await supabase.auth.signOut()
-      if (error) throw error
-      router.push('/auth')
-    } catch (error) {
-      console.error('Error signing out:', error)
-    }
+  const handleSettingsClick = () => {
+    router.push('/settings')
   }
 
   if (isLoading) {
@@ -191,7 +168,7 @@ export default function ProfilePage() {
       <div className="bg-white px-4 py-3 flex items-center justify-between shadow-sm">
         <h1 className="text-xl font-bold text-gray-900">マイページ</h1>
         <button
-          onClick={handleSignOut}
+          onClick={handleSettingsClick}
           className="p-2"
         >
           <Cog6ToothIcon className="h-6 w-6 text-gray-600" />

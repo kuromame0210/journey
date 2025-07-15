@@ -49,71 +49,24 @@ export default function ChatListPage() {
 
   const fetchChatRooms = async (userId: string) => {
     try {
-      // In a real app, you'd join tables to get place and user info
-      // For now, we'll simulate some data
-      const mockData: ChatRoom[] = [
-        {
-          id: '1',
-          place_id: 'place1',
-          user_a: userId,
-          user_b: 'other1',
-          created_at: new Date().toISOString(),
-          place: {
-            title: '京都の清水寺',
-            images: ['https://via.placeholder.com/100x100?text=Place1']
-          },
-          other_user: {
-            name: '田中太郎'
-          },
-          latest_message: {
-            body: 'こんにちは！一緒に京都旅行しませんか？',
-            sent_at: new Date(Date.now() - 3600000).toISOString()
-          },
-          unread_count: 2
-        },
-        {
-          id: '2',
-          place_id: 'place2',
-          user_a: 'other2',
-          user_b: userId,
-          created_at: new Date().toISOString(),
-          place: {
-            title: '沖縄の美ら海水族館',
-            images: ['https://via.placeholder.com/100x100?text=Place2']
-          },
-          other_user: {
-            name: '佐藤花子'
-          },
-          latest_message: {
-            body: '日程調整ありがとうございます！',
-            sent_at: new Date(Date.now() - 7200000).toISOString()
-          },
-          unread_count: 0
-        },
-        {
-          id: '3',
-          place_id: 'place3',
-          user_a: userId,
-          user_b: 'other3',
-          created_at: new Date().toISOString(),
-          place: {
-            title: '北海道のラベンダー畑',
-            images: ['https://via.placeholder.com/100x100?text=Place3']
-          },
-          other_user: {
-            name: '鈴木三郎'
-          },
-          latest_message: {
-            body: '写真撮影、よろしくお願いします！',
-            sent_at: new Date(Date.now() - 86400000).toISOString()
-          },
-          unread_count: 1
-        }
-      ]
-
-      setChatRooms(mockData)
+      const { data, error } = await supabase
+        .from('chat_rooms')
+        .select(`
+          *,
+          places(*),
+          messages(
+            body,
+            sent_at
+          )
+        `)
+        .or(`user_a.eq.${userId},user_b.eq.${userId}`)
+        .order('created_at', { ascending: false })
+      
+      if (error) throw error
+      setChatRooms(data || [])
     } catch (error) {
       console.error('Error fetching chat rooms:', error)
+      setChatRooms([])
     } finally {
       setIsLoading(false)
     }
