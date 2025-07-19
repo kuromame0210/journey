@@ -33,6 +33,8 @@ export default function PlaceCreatePage() {
   const [user, setUser] = useState<{ id: string; email?: string } | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [images, setImages] = useState<string[]>([])
+  const [imageFiles, setImageFiles] = useState<File[]>([])
+  const [uploadingImages, setUploadingImages] = useState(false)
   
   const [formData, setFormData] = useState({
     title: '',
@@ -79,13 +81,80 @@ export default function PlaceCreatePage() {
 
   const handleImageAdd = () => {
     if (images.length < 5) {
-      // TODO: Implement image upload functionality
-      alert('画像アップロード機能は後で実装予定です')
+      const input = document.createElement('input')
+      input.type = 'file'
+      input.accept = 'image/*'
+      input.multiple = true
+      input.onchange = (e) => {
+        const files = Array.from((e.target as HTMLInputElement).files || [])
+        const remainingSlots = 5 - images.length
+        const filesToAdd = files.slice(0, remainingSlots)
+        
+        if (filesToAdd.length > 0) {
+          handleImageUpload(filesToAdd)
+        }
+      }
+      input.click()
     }
   }
 
-  const handleImageRemove = (index: number) => {
+  const handleImageUpload = async (files: File[]) => {
+    if (!user) return
+    
+    setUploadingImages(true)
+    
+    try {
+      const uploadPromises = files.map(async (file, index) => {
+        const fileExt = file.name.split('.').pop()
+        const fileName = `${user.id}/${Date.now()}-${index}.${fileExt}`
+        
+        const { data, error } = await supabase.storage
+          .from('place-images')
+          .upload(fileName, file, {
+            cacheControl: '3600',
+            upsert: false
+          })
+        
+        if (error) throw error
+        
+        const { data: { publicUrl } } = supabase.storage
+          .from('place-images')
+          .getPublicUrl(fileName)
+        
+        return publicUrl
+      })
+      
+      const uploadedUrls = await Promise.all(uploadPromises)
+      setImages(prev => [...prev, ...uploadedUrls])
+      setImageFiles(prev => [...prev, ...files])
+    } catch (error) {
+      console.error('Error uploading images:', error)
+      alert('画像のアップロードに失敗しました')
+    } finally {
+      setUploadingImages(false)
+    }
+  }
+
+  const handleImageRemove = async (index: number) => {
+    const imageUrl = images[index]
+    const imageFile = imageFiles[index]
+    
+    // Remove from storage if it was uploaded
+    if (imageUrl && user) {
+      try {
+        const fileName = imageUrl.split('/').pop()
+        if (fileName) {
+          await supabase.storage
+            .from('place-images')
+            .remove([`${user.id}/${fileName}`])
+        }
+      } catch (error) {
+        console.error('Error removing image from storage:', error)
+      }
+    }
+    
     setImages(images.filter((_, i) => i !== index))
+    setImageFiles(imageFiles.filter((_, i) => i !== index))
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -170,9 +239,14 @@ export default function PlaceCreatePage() {
               <button
                 type="button"
                 onClick={handleImageAdd}
-                className="aspect-square border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center hover:border-blue-500 transition-colors"
+                disabled={uploadingImages}
+                className="aspect-square border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center hover:border-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <PhotoIcon className="h-8 w-8 text-gray-400" />
+                {uploadingImages ? (
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-400"></div>
+                ) : (
+                  <PhotoIcon className="h-8 w-8 text-gray-400" />
+                )}
               </button>
             )}
           </div>

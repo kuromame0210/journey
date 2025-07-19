@@ -30,6 +30,7 @@ export type Database = {
           demand_tags: number[] | null
           phone: string | null
           email: string | null
+          avatar_url: string | null
           created_at: string
         }
         Insert: {
@@ -45,6 +46,7 @@ export type Database = {
           demand_tags?: number[] | null
           phone?: string | null
           email?: string | null
+          avatar_url?: string | null
           created_at?: string
         }
         Update: {
@@ -60,6 +62,7 @@ export type Database = {
           demand_tags?: number[] | null
           phone?: string | null
           email?: string | null
+          avatar_url?: string | null
           created_at?: string
         }
       }

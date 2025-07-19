@@ -17,6 +17,7 @@ interface Profile {
   budget_pref: number[]
   purpose_tags: number[]
   demand_tags: number[]
+  avatar_url: string | null
 }
 
 interface Place {
@@ -34,6 +35,12 @@ export default function ProfilePage() {
   const [activeTab, setActiveTab] = useState<'posted' | 'liked' | 'kept' | 'passed'>('posted')
   const [places, setPlaces] = useState<Place[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [tabCounts, setTabCounts] = useState({
+    posted: 0,
+    liked: 0,
+    kept: 0,
+    passed: 0
+  })
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -44,6 +51,7 @@ export default function ProfilePage() {
       }
       setUser(session.user)
       fetchProfile(session.user.id)
+      fetchAllCounts(session.user.id)
       fetchPlaces(session.user.id, 'posted')
     }
 
@@ -107,6 +115,36 @@ export default function ProfilePage() {
     }
   }
 
+  const fetchAllCounts = async (userId: string) => {
+    try {
+      // 投稿数を取得
+      const { count: postedCount } = await supabase
+        .from('places')
+        .select('*', { count: 'exact', head: true })
+        .eq('owner', userId)
+
+      // リアクション数を取得
+      const { data: reactions } = await supabase
+        .from('reactions')
+        .select('type')
+        .eq('from_uid', userId)
+
+      const likedCount = reactions?.filter(r => r.type === 'like').length || 0
+      const keptCount = reactions?.filter(r => r.type === 'keep').length || 0
+      const passedCount = reactions?.filter(r => r.type === 'pass').length || 0
+
+      setTabCounts({
+        posted: postedCount || 0,
+        liked: likedCount,
+        kept: keptCount,
+        passed: passedCount
+      })
+    } catch (error) {
+      console.error('Error fetching counts:', error)
+      setTabCounts({ posted: 0, liked: 0, kept: 0, passed: 0 })
+    }
+  }
+
   const handleTabChange = (tab: 'posted' | 'liked' | 'kept' | 'passed') => {
     setActiveTab(tab)
     if (user) {
@@ -155,12 +193,6 @@ export default function ProfilePage() {
     passed: '興味ない'
   }
 
-  const tabCounts = {
-    posted: 2,
-    liked: 1,
-    kept: 1,
-    passed: 0
-  }
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
@@ -180,9 +212,17 @@ export default function ProfilePage() {
         <div className="p-6">
           <div className="flex items-start justify-between mb-4">
             <div className="flex items-center space-x-4">
-              <div className="w-20 h-20 bg-gradient-to-br from-blue-400 to-purple-500 rounded-full flex items-center justify-center text-white text-2xl font-bold">
-                {profile.name.charAt(0)}
-              </div>
+              {profile.avatar_url ? (
+                <img
+                  src={profile.avatar_url}
+                  alt={`${profile.name}のプロフィール画像`}
+                  className="w-20 h-20 rounded-full object-cover border-2 border-gray-200"
+                />
+              ) : (
+                <div className="w-20 h-20 bg-gradient-to-br from-blue-400 to-purple-500 rounded-full flex items-center justify-center text-white text-2xl font-bold">
+                  {profile.name.charAt(0)}
+                </div>
+              )}
               <div>
                 <h2 className="text-xl font-bold text-gray-900">{profile.name}</h2>
                 <p className="text-gray-600">
@@ -217,36 +257,74 @@ export default function ProfilePage() {
             <div>
               <h4 className="text-sm font-medium text-gray-900 mb-2">予算帯</h4>
               <div className="flex flex-wrap gap-2">
-                <span className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm">
-                  低・中
-                </span>
+                {profile.budget_pref && profile.budget_pref.length > 0 ? (
+                  profile.budget_pref.map((budgetId: number) => {
+                    const budgetLabel = budgetId === 1 ? '低 (〜3万円)' : 
+                                       budgetId === 2 ? '中 (3〜10万円)' : 
+                                       budgetId === 3 ? '高 (10万円〜)' : 
+                                       budgetId === 4 ? '低 (〜3万円)' : 
+                                       budgetId === 5 ? '中 (3〜10万円)' : 
+                                       budgetId === 6 ? '高 (10万円〜)' : '不明'
+                    return (
+                      <span key={budgetId} className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm">
+                        {budgetLabel}
+                      </span>
+                    )
+                  })
+                ) : (
+                  <span className="px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-sm">
+                    未設定
+                  </span>
+                )}
               </div>
             </div>
 
             <div>
               <h4 className="text-sm font-medium text-gray-900 mb-2">旅の目的</h4>
               <div className="flex flex-wrap gap-2">
-                <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">
-                  観光
-                </span>
-                <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">
-                  グルメ
-                </span>
-                <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">
-                  写真撮影
-                </span>
+                {profile.purpose_tags && profile.purpose_tags.length > 0 ? (
+                  profile.purpose_tags.map((tagId: number) => {
+                    const purposeLabels: { [key: number]: string } = {
+                      1: '観光', 2: 'グルメ', 3: '写真撮影', 
+                      4: 'アクティビティ', 5: 'ショッピング', 6: '温泉・リラックス',
+                      7: '自然', 8: '歴史・文化', 9: 'テーマパーク', 10: 'スポーツ'
+                    }
+                    return (
+                      <span key={tagId} className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">
+                        {purposeLabels[tagId] || '不明'}
+                      </span>
+                    )
+                  })
+                ) : (
+                  <span className="px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-sm">
+                    未設定
+                  </span>
+                )}
               </div>
             </div>
 
             <div>
               <h4 className="text-sm font-medium text-gray-900 mb-2">相手に求めること</h4>
               <div className="flex flex-wrap gap-2">
-                <span className="px-3 py-1 bg-orange-100 text-orange-800 rounded-full text-sm">
-                  写真を撮ってくれる人
-                </span>
-                <span className="px-3 py-1 bg-orange-100 text-orange-800 rounded-full text-sm">
-                  一緒に食事を楽しめる人
-                </span>
+                {profile.demand_tags && profile.demand_tags.length > 0 ? (
+                  profile.demand_tags.map((tagId: number) => {
+                    const demandLabels: { [key: number]: string } = {
+                      1: '写真を撮ってくれる人', 2: '一緒に食事を楽しめる人', 
+                      3: '体力がある人', 4: '計画性がある人', 5: '語学ができる人',
+                      6: '運転ができる人', 7: '現地に詳しい人', 8: '同年代の人',
+                      9: '話しやすい人', 10: '時間に余裕がある人'
+                    }
+                    return (
+                      <span key={tagId} className="px-3 py-1 bg-orange-100 text-orange-800 rounded-full text-sm">
+                        {demandLabels[tagId] || '不明'}
+                      </span>
+                    )
+                  })
+                ) : (
+                  <span className="px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-sm">
+                    未設定
+                  </span>
+                )}
               </div>
             </div>
           </div>
