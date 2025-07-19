@@ -108,7 +108,7 @@ export default function PlaceCreatePage() {
         const fileExt = file.name.split('.').pop()
         const fileName = `${user.id}/${Date.now()}-${index}.${fileExt}`
         
-        const { data, error } = await supabase.storage
+        const { error } = await supabase.storage
           .from('place-images')
           .upload(fileName, file, {
             cacheControl: '3600',
@@ -137,7 +137,6 @@ export default function PlaceCreatePage() {
 
   const handleImageRemove = async (index: number) => {
     const imageUrl = images[index]
-    const imageFile = imageFiles[index]
     
     // Remove from storage if it was uploaded
     if (imageUrl && user) {

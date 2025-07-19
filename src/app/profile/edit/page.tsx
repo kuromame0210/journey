@@ -151,8 +151,8 @@ export default function ProfileEditPage() {
           setAvatarPreview(data.avatar_url)
         }
       }
-    } catch (error) {
-      console.error('Error fetching profile:', error)
+    } catch (fetchError) {
+      console.error('Error fetching profile:', fetchError)
     }
   }
 
@@ -201,7 +201,7 @@ export default function ProfileEditPage() {
       const fileExt = file.name.split('.').pop()
       const fileName = `${userId}/avatar.${fileExt}`
       
-      const { data, error } = await supabase.storage
+      const { error } = await supabase.storage
         .from('avatars')
         .upload(fileName, file, {
           cacheControl: '3600',
@@ -268,7 +268,7 @@ export default function ProfileEditPage() {
 
       console.log('Saving profile data:', profileData)
       
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('profiles')
         .upsert([profileData])
 
@@ -277,15 +277,15 @@ export default function ProfileEditPage() {
         throw error
       }
 
-      console.log('Profile saved successfully:', data)
+      console.log('Profile saved successfully')
       
       // Reset avatar file after successful save
       setAvatarFile(null)
       
       router.push('/profile')
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error saving profile:', error)
-      alert(`プロフィールの保存中にエラーが発生しました: ${error.message || error}`)
+      alert(`プロフィールの保存中にエラーが発生しました: ${error instanceof Error ? error.message : String(error)}`)
     } finally {
       setIsLoading(false)
     }
