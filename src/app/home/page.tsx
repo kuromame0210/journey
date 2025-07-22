@@ -38,17 +38,21 @@ export default function HomePage() {
       }
       
       setUser(user)
-      fetchPlaces()
+      // Pass user directly instead of relying on state
+      if (user) {
+        fetchPlacesWithUser(user)
+      }
     }
 
     initAuth()
   }, [router])
 
-  const fetchPlaces = async () => {
+  const fetchPlacesWithUser = async (currentUser: { id: string; email?: string }) => {
     try {
       const { data, error } = await supabase
         .from('places')
         .select('*')
+        .neq('owner', currentUser.id)
         .order('created_at', { ascending: false })
         .limit(30)
 
@@ -128,7 +132,9 @@ export default function HomePage() {
             <button
               onClick={() => {
                 setCurrentIndex(0)
-                fetchPlaces()
+                if (user) {
+                  fetchPlacesWithUser(user)
+                }
               }}
               className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors"
             >
