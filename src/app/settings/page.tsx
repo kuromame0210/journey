@@ -20,12 +20,30 @@ export default function SettingsPage() {
   const handleLogout = async () => {
     setIsLoggingOut(true)
     try {
+      // セッション状態を確認
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      if (!session) {
+        console.log('セッションが存在しません。ローカルストレージをクリアして認証画面へ')
+        // ローカルストレージを手動でクリア
+        localStorage.clear()
+        router.push('/auth')
+        return
+      }
+
       const { error } = await supabase.auth.signOut()
-      if (error) throw error
+      if (error) {
+        console.error('ログアウトエラー:', error)
+        // エラーでも強制的にログアウトする
+        localStorage.clear()
+      }
+      
       router.push('/auth')
     } catch (error) {
       console.error('Error signing out:', error)
-      alert('ログアウトに失敗しました')
+      // エラーが発生してもローカルストレージをクリアして認証画面へ
+      localStorage.clear()
+      router.push('/auth')
     } finally {
       setIsLoggingOut(false)
       setShowLogoutConfirm(false)

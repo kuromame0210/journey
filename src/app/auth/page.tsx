@@ -63,15 +63,47 @@ export default function AuthPage() {
         return
       }
 
-      const { error } = await supabase.auth.signUp({
+      console.log('🚀 サインアップ開始:', { email, timestamp: new Date().toISOString() })
+      console.log('📧 Supabase設定確認:', { 
+        url: process.env.NEXT_PUBLIC_SUPABASE_URL?.substring(0, 30) + '...',
+        keyLength: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.length,
+        isConfigured: isSupabaseConfigured
+      })
+
+      const { data, error } = await supabase.auth.signUp({
         email: email,
         password: password,
       })
 
-      if (error) throw error
+      console.log('📊 サインアップレスポンス:', {
+        success: !error,
+        hasUser: !!data?.user,
+        userId: data?.user?.id,
+        userEmail: data?.user?.email,
+        emailConfirmed: data?.user?.email_confirmed_at,
+        needsConfirmation: !data?.user?.email_confirmed_at,
+        timestamp: new Date().toISOString()
+      })
+
+      if (error) {
+        console.error('❌ サインアップエラー詳細:', {
+          message: error.message,
+          status: error.status,
+          name: error.name,
+          details: error
+        })
+        throw error
+      }
+
+      if (data?.user && !data.user.email_confirmed_at) {
+        console.log('✅ メール認証が必要 - 認証メールが送信されました')
+      } else if (data?.user?.email_confirmed_at) {
+        console.log('⚠️ メール認証不要 - 即座に認証済み')
+      }
+
       setStep('email_sent')
     } catch (error) {
-      console.error('Error:', error)
+      console.error('💥 予期しないエラー:', error)
       alert('アカウント作成に失敗しました')
     } finally {
       setIsLoading(false)
