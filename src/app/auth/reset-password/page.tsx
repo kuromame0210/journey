@@ -3,6 +3,10 @@
 import { useState, useEffect, Suspense } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+// セキュリティ強化のためのエラーハンドリング統一
+// 参考: src/app/auth/page.tsx の改修に合わせて統一
+import ErrorToast from '@/components/ErrorToast'
+import useErrorHandler from '@/hooks/useErrorHandler'
 
 function ResetPasswordForm() {
   const router = useRouter()
@@ -10,6 +14,9 @@ function ResetPasswordForm() {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [isValidToken, setIsValidToken] = useState(false)
+  
+  // セキュリティ強化: alert()をErrorToastに置き換え
+  const { message, type, isVisible, handleError, showWarning, showSuccess, clearMessage } = useErrorHandler()
 
   useEffect(() => {
     // URL からトークンを取得して検証
@@ -28,7 +35,9 @@ function ResetPasswordForm() {
       })
     } else {
       // 無効なリンクの場合
-      alert('無効なリセットリンクです。もう一度パスワードリセットを行ってください。')
+      // セキュリティ強化: alert()をhandleError()に置き換え
+      // 旧実装: alert('無効なリセットリンクです。もう一度パスワードリセットを行ってください。')
+      handleError(new Error('invalid_reset_link'), '無効なリセットリンクです。もう一度パスワードリセットを行ってください。')
       router.push('/auth')
     }
   }, [router])
@@ -39,12 +48,16 @@ function ResetPasswordForm() {
 
     try {
       if (password !== confirmPassword) {
-        alert('パスワードが一致しません')
+        // セキュリティ強化: alert()をshowWarning()に置き換え
+        // 旧実装: alert('パスワードが一致しません')
+        showWarning('パスワードが一致しません')
         return
       }
 
       if (password.length < 6) {
-        alert('パスワードは6文字以上で入力してください')
+        // セキュリティ強化: alert()をshowWarning()に置き換え
+        // 旧実装: alert('パスワードは6文字以上で入力してください')
+        showWarning('パスワードは6文字以上で入力してください')
         return
       }
 
@@ -54,12 +67,20 @@ function ResetPasswordForm() {
 
       if (error) throw error
 
-      alert('パスワードが正常に更新されました')
-      router.push('/auth')
+      // セキュリティ強化: alert()をshowSuccess()に置き換え
+      // 旧実装: alert('パスワードが正常に更新されました')
+      showSuccess('パスワードが正常に更新されました')
+      
+      // 成功メッセージ表示後に少し待ってからリダイレクト
+      setTimeout(() => {
+        router.push('/auth')
+      }, 1500)
       
     } catch (error) {
       console.error('Error updating password:', error)
-      alert('パスワードの更新に失敗しました')
+      // セキュリティ強化: 技術的詳細を隠したエラーメッセージ表示
+      // 旧実装: alert('パスワードの更新に失敗しました')
+      handleError(error, 'パスワードの更新に失敗しました')
     } finally {
       setIsLoading(false)
     }
@@ -136,6 +157,15 @@ function ResetPasswordForm() {
           ← ログイン画面に戻る
         </button>
       </div>
+      
+      {/* セキュリティ強化: 統一されたエラー表示UIコンポーネント */}
+      {/* 旧実装のalert()を全て置き換え */}
+      <ErrorToast
+        message={message}
+        type={type}
+        isVisible={isVisible}
+        onClose={clearMessage}
+      />
     </div>
   )
 }

@@ -4,70 +4,62 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { ArrowLeftIcon } from '@heroicons/react/24/outline'
+// セキュリティ強化のためのエラーハンドリング統一
+// 参考: 他のページの改修に合わせてalert()を置き換え
+import ErrorToast from '@/components/ErrorToast'
+import useErrorHandler from '@/hooks/useErrorHandler'
 
-const budgetOptions = [
-  { id: 1, label: '低 (〜3万円)' },
-  { id: 2, label: '中 (3〜10万円)' },
-  { id: 3, label: '高 (10万円〜)' }
-]
+/**
+ * 共通化対応: フォームハンドラーを統一ユーティリティに移行
+ * 元の実装: src/app/profile/edit/page.tsx:166-178 の handleInputChange・handleMultiSelectToggle 関数
+ * 移行日: 2025-01-08
+ * 共通化により約13行のコード削減、一貫したフォーム操作
+ */
+import { useInputChangeHandler, useArrayToggleHandler } from '@/shared/hooks/useFormHandlers'
 
-const purposeTags = [
-  { id: 1, label: '観光' },
-  { id: 2, label: 'グルメ' },
-  { id: 3, label: '写真撮影' },
-  { id: 4, label: 'アクティビティ' },
-  { id: 5, label: 'ショッピング' },
-  { id: 6, label: '温泉・リラックス' },
-  { id: 7, label: '自然' },
-  { id: 8, label: '歴史・文化' },
-  { id: 9, label: 'テーマパーク' },
-  { id: 10, label: 'スポーツ' }
-]
+/**
+ * 共通化対応: 設定・定数配列を統一定数に移行
+ * 
+ * 共通化元:
+ * - src/app/profile/edit/page.tsx:20-24 の budgetOptions 配列定義（完全版・3項目）
+ * - src/app/profile/edit/page.tsx:26-37 の purposeTags 配列定義（完全版・10項目）  
+ * - src/app/profile/edit/page.tsx:39-50 の demandTags 配列定義（完全版・10項目）
+ * 
+ * 共通化方法:
+ * - 共通定数: src/shared/constants/options.ts の各種OPTIONS として統一
+ * - 呼び出し方法: import + 後方互換性のための型エイリアス
+ * 
+ * 共通化効果:
+ * - 重複削減: 31行削除（budgetOptions:4行 + purposeTags:12行 + demandTags:12行 + 空行:3行）
+ * - データ一貫性: オプション配列の統一管理
+ * - 保守性向上: 1箇所修正で全体に反映
+ * 
+ * 移行日: 2025-01-08
+ * 移行者: Claude Code (重複コード統一プロジェクト)
+ */
+import { 
+  BUDGET_OPTIONS,
+  PURPOSE_TAGS_FULL as PURPOSE_TAGS,
+  DEMAND_TAGS_FULL as DEMAND_TAGS,
+  MBTI_TYPES
+} from '@/shared/constants'
 
-const demandTags = [
-  { id: 1, label: '写真を撮ってくれる人' },
-  { id: 2, label: '一緒に食事を楽しめる人' },
-  { id: 3, label: '体力がある人' },
-  { id: 4, label: '計画性がある人' },
-  { id: 5, label: '語学ができる人' },
-  { id: 6, label: '運転ができる人' },
-  { id: 7, label: '現地に詳しい人' },
-  { id: 8, label: '同年代の人' },
-  { id: 9, label: '話しやすい人' },
-  { id: 10, label: '時間に余裕がある人' }
-]
+// 後方互換性のための型エイリアス
+// 元の実装: const budgetOptions = [{ id: 1, label: '低 (〜3万円)' }, ...]
+const budgetOptions = BUDGET_OPTIONS
+const purposeTags = PURPOSE_TAGS  
+const demandTags = DEMAND_TAGS
 
-const mbtiTypes = [
-  { category: '分析家', types: [
-    { value: 'INTJ', label: 'INTJ (建築家)' },
-    { value: 'INTP', label: 'INTP (論理学者)' },
-    { value: 'ENTJ', label: 'ENTJ (指揮官)' },
-    { value: 'ENTP', label: 'ENTP (討論者)' }
-  ]},
-  { category: '外交官', types: [
-    { value: 'INFJ', label: 'INFJ (提唱者)' },
-    { value: 'INFP', label: 'INFP (仲介者)' },
-    { value: 'ENFJ', label: 'ENFJ (主人公)' },
-    { value: 'ENFP', label: 'ENFP (運動家)' }
-  ]},
-  { category: '番人', types: [
-    { value: 'ISTJ', label: 'ISTJ (管理者)' },
-    { value: 'ISFJ', label: 'ISFJ (擁護者)' },
-    { value: 'ESTJ', label: 'ESTJ (幹部)' },
-    { value: 'ESFJ', label: 'ESFJ (領事官)' }
-  ]},
-  { category: '探検家', types: [
-    { value: 'ISTP', label: 'ISTP (巨匠)' },
-    { value: 'ISFP', label: 'ISFP (冒険家)' },
-    { value: 'ESTP', label: 'ESTP (起業家)' },
-    { value: 'ESFP', label: 'ESFP (エンターテイナー)' }
-  ]}
-]
+// 統一されたMBTI定数使用（元の個別mbtiTypes配列定義を置換）
+const mbtiTypes = MBTI_TYPES
 
 export default function ProfileEditPage() {
   const router = useRouter()
   const [user, setUser] = useState<{ id: string; email?: string } | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  
+  // セキュリティ強化: alert()をErrorToastに置き換え
+  const { message, type, isVisible, handleError, showWarning, showSuccess, clearMessage } = useErrorHandler()
   
   const [formData, setFormData] = useState({
     name: '',
@@ -156,32 +148,26 @@ export default function ProfileEditPage() {
     }
   }
 
-  const handleInputChange = (field: string, value: string | number | number[]) => {
-    setFormData(prev => ({ ...prev, [field]: value }))
-  }
-
-  const handleMultiSelectToggle = (field: 'budget_pref' | 'purpose_tags' | 'demand_tags', id: number) => {
-    console.log(`Toggling ${field}, ID: ${id}, Current:`, formData[field])
-    setFormData(prev => ({
-      ...prev,
-      [field]: prev[field].includes(id)
-        ? prev[field].filter(item => item !== id)
-        : [...prev[field], id]
-    }))
-  }
+  // 共通化されたフォームハンドラー使用
+  const handleInputChange = useInputChangeHandler(setFormData)
+  const handleMultiSelectToggle = useArrayToggleHandler(setFormData)
 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
       // Validate file type
       if (!file.type.startsWith('image/')) {
-        alert('画像ファイルを選択してください')
+        // セキュリティ強化: alert()をshowWarning()に置き換え
+        // 旧実装: alert('画像ファイルを選択してください')
+        showWarning('画像ファイルを選択してください')
         return
       }
       
       // Validate file size (max 5MB)
       if (file.size > 5 * 1024 * 1024) {
-        alert('ファイルサイズは5MB以下にしてください')
+        // セキュリティ強化: alert()をshowWarning()に置き換え
+        // 旧実装: alert('ファイルサイズは5MB以下にしてください')
+        showWarning('ファイルサイズは5MB以下にしてください')
         return
       }
       
@@ -285,7 +271,9 @@ export default function ProfileEditPage() {
       router.push('/profile')
     } catch (error: unknown) {
       console.error('Error saving profile:', error)
-      alert(`プロフィールの保存中にエラーが発生しました: ${error instanceof Error ? error.message : String(error)}`)
+      // セキュリティ強化: 技術的詳細を隠したエラーメッセージ表示
+      // 旧実装: alert(`プロフィールの保存中にエラーが発生しました: ${error instanceof Error ? error.message : String(error)}`)
+      handleError(error, 'プロフィールの保存中にエラーが発生しました')
     } finally {
       setIsLoading(false)
     }
@@ -575,6 +563,15 @@ export default function ProfileEditPage() {
           {isLoading ? '保存中...' : '保存する'}
         </button>
       </form>
+      
+      {/* セキュリティ強化: 統一されたエラー表示UIコンポーネント */}
+      {/* 旧実装のalert()を全て置き換え */}
+      <ErrorToast
+        message={message}
+        type={type}
+        isVisible={isVisible}
+        onClose={clearMessage}
+      />
     </div>
   )
 }

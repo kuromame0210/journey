@@ -3,6 +3,10 @@
 import { useState } from 'react'
 import { supabase, isSupabaseConfigured } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
+// セキュリティ強化のためのエラーハンドリング統一
+// 参考: 既存のalert()を置き換えてセキュリティとUXを向上
+import ErrorToast from '@/components/ErrorToast'
+import useErrorHandler from '@/hooks/useErrorHandler'
 
 export default function AuthPage() {
   const [isLoading, setIsLoading] = useState(false)
@@ -12,6 +16,9 @@ export default function AuthPage() {
   const [mode, setMode] = useState<'login' | 'signup' | 'reset'>('login')
   const [step, setStep] = useState<'form' | 'email_sent' | 'reset_sent'>('form')
   const router = useRouter()
+  
+  // セキュリティ強化: alert()をErrorToastに置き換え
+  const { message, type, isVisible, handleError, showWarning, showSuccess, clearMessage } = useErrorHandler()
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -42,7 +49,9 @@ export default function AuthPage() {
       }
     } catch (error) {
       console.error('Error:', error)
-      alert('メールアドレスまたはパスワードが間違っています')
+      // セキュリティ強化: 技術的詳細を隠したエラーメッセージ表示
+      // 旧実装: alert('メールアドレスまたはパスワードが間違っています')
+      handleError(error, 'メールアドレスまたはパスワードが間違っています')
     } finally {
       setIsLoading(false)
     }
@@ -54,12 +63,16 @@ export default function AuthPage() {
 
     try {
       if (password !== confirmPassword) {
-        alert('パスワードが一致しません')
+        // セキュリティ強化: alert()をshowWarning()に置き換え
+        // 旧実装: alert('パスワードが一致しません')
+        showWarning('パスワードが一致しません')
         return
       }
 
       if (password.length < 6) {
-        alert('パスワードは6文字以上で入力してください')
+        // セキュリティ強化: alert()をshowWarning()に置き換え
+        // 旧実装: alert('パスワードは6文字以上で入力してください')
+        showWarning('パスワードは6文字以上で入力してください')
         return
       }
 
@@ -70,6 +83,7 @@ export default function AuthPage() {
         isConfigured: isSupabaseConfigured
       })
 
+      // Supabaseでの新規登録実行
       const { data, error } = await supabase.auth.signUp({
         email: email,
         password: password,
@@ -95,6 +109,13 @@ export default function AuthPage() {
         throw error
       }
 
+      // Supabaseの重複チェック結果を確認
+      if (data.user && !data.session && data.user.identities && data.user.identities.length === 0) {
+        // 既存ユーザーの場合、identitiesが空の配列になる
+        showWarning('このメールアドレスは既に登録されています')
+        return
+      }
+
       if (data?.user && !data.user.email_confirmed_at) {
         console.log('✅ メール認証が必要 - 認証メールが送信されました')
       } else if (data?.user?.email_confirmed_at) {
@@ -104,7 +125,9 @@ export default function AuthPage() {
       setStep('email_sent')
     } catch (error) {
       console.error('💥 予期しないエラー:', error)
-      alert('アカウント作成に失敗しました')
+      // セキュリティ強化: 技術的詳細を隠したエラーメッセージ表示
+      // 旧実装: alert('アカウント作成に失敗しました')
+      handleError(error, 'アカウント作成に失敗しました')
     } finally {
       setIsLoading(false)
     }
@@ -123,7 +146,9 @@ export default function AuthPage() {
       setStep('reset_sent')
     } catch (error) {
       console.error('Error:', error)
-      alert('パスワードリセットの送信に失敗しました')
+      // セキュリティ強化: 技術的詳細を隠したエラーメッセージ表示
+      // 旧実装: alert('パスワードリセットの送信に失敗しました')
+      handleError(error, 'パスワードリセットの送信に失敗しました')
     } finally {
       setIsLoading(false)
     }
@@ -138,12 +163,16 @@ export default function AuthPage() {
       if (error) throw error
     } catch (error) {
       console.error('Error:', error)
-      alert('Apple認証でエラーが発生しました')
+      // セキュリティ強化: 技術的詳細を隠したエラーメッセージ表示
+      // 旧実装: alert('Apple認証でエラーが発生しました')
+      handleError(error, 'Apple認証でエラーが発生しました')
     }
   }
 
   const handleLineAuth = async () => {
-    alert('LINE認証は準備中です')
+    // セキュリティ強化: alert()をshowInfo()に置き換え
+    // 旧実装: alert('LINE認証は準備中です')
+    showWarning('LINE認証は準備中です')
   }
 
   return (
@@ -361,6 +390,15 @@ export default function AuthPage() {
           </div>
         </div>
       ) : null}
+      
+      {/* セキュリティ強化: 統一されたエラー表示UIコンポーネント */}
+      {/* 旧実装のalert()を全て置き換え */}
+      <ErrorToast
+        message={message}
+        type={type}
+        isVisible={isVisible}
+        onClose={clearMessage}
+      />
     </div>
   )
 }

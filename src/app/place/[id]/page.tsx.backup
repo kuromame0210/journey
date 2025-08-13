@@ -9,32 +9,25 @@ import { ArrowLeftIcon, MapPinIcon, CalendarDaysIcon, UserGroupIcon, HeartIcon, 
 import ErrorToast from '@/components/ErrorToast'
 import useErrorHandler from '@/hooks/useErrorHandler'
 
-/**
- * 共通化対応: Place型定義を統一型に移行
- * 元の実装: src/app/place/[id]/page.tsx:12-30 の Place interface
- * 移行日: 2025-01-08
- * 共通化により型の一貫性を確保、他ファイルとの重複を解消
- */
-import { PlaceDetail } from '@/shared/types/database'
-
-/**
- * 共通化対応: 重複していたローディングUIを統一コンポーネントに移行
- * 元の実装: src/app/place/[id]/page.tsx:103-112 のローディング画面
- * 移行日: 2025-01-08
- * 共通化により約10行のコード削減、一貫したUX提供
- */
-import { LoadingSpinner } from '@/shared/components/LoadingSpinner'
-
-/**
- * 共通化対応: 日付フォーマット関数を統一ユーティリティに移行
- * 元の実装: src/app/place/[id]/page.tsx:187-188 の直接日付フォーマット
- * 移行日: 2025-01-08
- * 共通化により約2行のコード削減、一貫した日付表示
- */
-import { formatDateRange } from '@/shared/utils/date'
-
-// 後方互換性のための型エイリアス
-type Place = PlaceDetail
+interface Place {
+  id: string
+  title: string
+  images: string[]
+  genre: string
+  purpose_tags: number[]
+  demand_tags: number[]
+  budget_option: number
+  purpose_text: string
+  budget_min: number
+  budget_max: number
+  date_start: string
+  date_end: string
+  recruit_num: number
+  first_choice: string
+  second_choice: string
+  gmap_url: string
+  owner: string
+}
 
 export default function PlaceDetailPage() {
   const params = useParams()
@@ -108,7 +101,14 @@ export default function PlaceDetailPage() {
   }
 
   if (isLoading) {
-    return <LoadingSpinner message="場所の詳細を読み込み中..." />
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">読み込み中...</p>
+        </div>
+      </div>
+    )
   }
 
   if (!place) {
@@ -192,7 +192,8 @@ export default function PlaceDetailPage() {
           <div className="flex items-center mb-4 text-gray-600">
             <CalendarDaysIcon className="h-5 w-5 mr-2" />
             <span>
-              {formatDateRange(place.date_start, place.date_end)}
+              {new Date(place.date_start).toLocaleDateString('ja-JP')}
+              {place.date_end && ` ～ ${new Date(place.date_end).toLocaleDateString('ja-JP')}`}
             </span>
           </div>
         )}

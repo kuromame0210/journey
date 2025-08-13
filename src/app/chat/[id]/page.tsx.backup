@@ -9,32 +9,27 @@ import { ArrowLeftIcon, PaperAirplaneIcon, PhotoIcon } from '@heroicons/react/24
 import ErrorToast from '@/components/ErrorToast'
 import useErrorHandler from '@/hooks/useErrorHandler'
 
-/**
- * 共通化対応: Message・ChatRoom型定義を統一型に移行
- * 元の実装: src/app/chat/[id]/page.tsx:12-32 の Message・ChatRoom interface
- * 移行日: 2025-01-08
- * 共通化により型の一貫性を確保、他ファイルとの重複を解消
- */
-import { Message, ChatRoomDetail } from '@/shared/types/database'
+interface Message {
+  id: string
+  room_id: string
+  sender: string
+  body: string
+  sent_at: string
+}
 
-/**
- * 共通化対応: 重複していたローディングUIを統一コンポーネントに移行
- * 元の実装: src/app/chat/[id]/page.tsx:142-151 のローディング画面
- * 移行日: 2025-01-08
- * 共通化により約10行のコード削減、一貫したUX提供
- */
-import { LoadingSpinner } from '@/shared/components/LoadingSpinner'
-
-/**
- * 共通化対応: 日付フォーマット関数を統一ユーティリティに移行
- * 元の実装: src/app/chat/[id]/page.tsx:125-137 の formatTime・formatDate 関数
- * 移行日: 2025-01-08
- * 共通化により約13行のコード削減、一貫した日付表示
- */
-import { formatTime, formatMessageDate, formatDateRange } from '@/shared/utils/date'
-
-// 後方互換性のための型エイリアス
-type ChatRoom = ChatRoomDetail
+interface ChatRoom {
+  id: string
+  place_id: string
+  place: {
+    title: string
+    date_start: string
+    date_end: string
+  }
+  other_user: {
+    id: string
+    name: string
+  }
+}
 
 export default function ChatRoomPage() {
   const params = useParams()
@@ -130,9 +125,29 @@ export default function ChatRoomPage() {
     }
   }
 
+  const formatTime = (timestamp: string) => {
+    return new Date(timestamp).toLocaleTimeString('ja-JP', {
+      hour: '2-digit',
+      minute: '2-digit'
+    })
+  }
+
+  const formatDate = (timestamp: string) => {
+    return new Date(timestamp).toLocaleDateString('ja-JP', {
+      month: 'short',
+      day: 'numeric'
+    })
+  }
 
   if (isLoading) {
-    return <LoadingSpinner message="チャットルームを読み込み中..." />
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">読み込み中...</p>
+        </div>
+      </div>
+    )
   }
 
   if (!chatRoom) {
@@ -171,7 +186,8 @@ export default function ChatRoomPage() {
               {chatRoom.other_user.name} さんとの {chatRoom.place.title}
             </h2>
             <p className="text-xs text-gray-600 mt-1">
-              📅 {formatDateRange(chatRoom.place.date_start, chatRoom.place.date_end)}
+              📅 {new Date(chatRoom.place.date_start).toLocaleDateString('ja-JP')}
+              {chatRoom.place.date_end && ` ～ ${new Date(chatRoom.place.date_end).toLocaleDateString('ja-JP')}`}
             </p>
           </div>
         </div>
@@ -190,7 +206,7 @@ export default function ChatRoomPage() {
               {showDate && (
                 <div className="text-center my-4">
                   <span className="bg-gray-100 text-gray-600 text-xs px-3 py-1 rounded-full">
-                    {formatMessageDate(message.sent_at)}
+                    {formatDate(message.sent_at)}
                   </span>
                 </div>
               )}

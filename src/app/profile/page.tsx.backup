@@ -6,43 +6,35 @@ import { supabase } from '@/lib/supabase'
 import BottomNavigation from '@/components/BottomNavigation'
 import { PencilIcon, Cog6ToothIcon } from '@heroicons/react/24/outline'
 
-/**
- * 共通化対応: 型定義を統一型に移行
- * 元の実装: src/app/profile/page.tsx:9-21 の Profile interface
- * 移行日: 2025-01-08
- * 共通化により型の一貫性を確保、他ファイルとの重複を解消
- */
-import { Profile, PlaceListItem } from '@/shared/types/database'
+interface Profile {
+  id: string
+  name: string
+  gender: 'male' | 'female' | 'other'
+  age: number
+  partner_gender: 'male' | 'female' | 'either'
+  must_condition: string
+  mbti: string
+  budget_pref: number[]
+  purpose_tags: number[]
+  demand_tags: number[]
+  avatar_url: string | null
+}
 
-/**
- * 共通化対応: 重複していたローディングUIを統一コンポーネントに移行
- * 元の実装: src/app/profile/page.tsx:148-157 のローディング画面
- * 移行日: 2025-01-08
- * 共通化により約10行のコード削減、一貫したUX提供
- */
-import { LoadingSpinner } from '@/shared/components/LoadingSpinner'
-
-/**
- * 共通化対応: 基本状態管理を統一フックに移行
- * 元の実装: src/app/profile/page.tsx:30,34 の user, isLoading useState
- * 移行日: 2025-01-08  
- * 共通化により約2行のコード削減、状態管理の一貫性確保
- */
-import { useBasePageState } from '@/shared/hooks/useBasePageState'
-
-// 後方互換性のための型エイリアス
-type Place = PlaceListItem
+interface Place {
+  id: string
+  title: string
+  images: string[]
+  genre: string
+  created_at: string
+}
 
 export default function ProfilePage() {
   const router = useRouter()
-  
-  // 統一された基本状態管理（元の個別useState実装を置換）
-  const { user, setUser, isLoading, setIsLoading, error, setError } = useBasePageState()
-  
+  const [user, setUser] = useState<{ id: string; email?: string } | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [activeTab, setActiveTab] = useState<'posted' | 'liked' | 'kept' | 'passed'>('posted')
   const [places, setPlaces] = useState<Place[]>([])
-
+  const [isLoading, setIsLoading] = useState(true)
   const [tabCounts, setTabCounts] = useState({
     posted: 0,
     liked: 0,
@@ -165,7 +157,14 @@ export default function ProfilePage() {
   }
 
   if (isLoading) {
-    return <LoadingSpinner message="プロフィールデータを読み込み中..." />
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">読み込み中...</p>
+        </div>
+      </div>
+    )
   }
 
   if (!profile) {
@@ -221,11 +220,11 @@ export default function ProfilePage() {
                 />
               ) : (
                 <div className="w-20 h-20 bg-gradient-to-br from-blue-400 to-purple-500 rounded-full flex items-center justify-center text-white text-2xl font-bold">
-                  {(profile.name || '?').charAt(0)}
+                  {profile.name.charAt(0)}
                 </div>
               )}
               <div>
-                <h2 className="text-xl font-bold text-gray-900">{profile.name || '名前未設定'}</h2>
+                <h2 className="text-xl font-bold text-gray-900">{profile.name}</h2>
                 <p className="text-gray-600">
                   {profile.age}歳 • {profile.gender === 'male' ? '男性' : profile.gender === 'female' ? '女性' : 'その他'}
                 </p>

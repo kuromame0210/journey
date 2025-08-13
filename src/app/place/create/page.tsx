@@ -4,29 +4,55 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { ArrowLeftIcon, PhotoIcon, XMarkIcon } from '@heroicons/react/24/outline'
+// セキュリティ強化のためのエラーハンドリング統一
+// 参考: 他のページの改修に合わせてalert()を置き換え
+import ErrorToast from '@/components/ErrorToast'
+import useErrorHandler from '@/hooks/useErrorHandler'
 
-const budgetOptions = [
-  { id: 1, label: '低 (〜3万円)' },
-  { id: 2, label: '中 (3〜10万円)' },
-  { id: 3, label: '高 (10万円〜)' }
-]
+/**
+ * 共通化対応: フォームハンドラーを統一ユーティリティに移行
+ * 元の実装: src/app/place/create/page.tsx:76-87 の handleInputChange・handleTagToggle 関数
+ * 移行日: 2025-01-08
+ * 共通化により約12行のコード削減、一貫したフォーム操作
+ */
+import { useInputChangeHandler, useArrayToggleHandler } from '@/shared/hooks/useFormHandlers'
 
-const purposeTags = [
-  { id: 1, label: '観光' },
-  { id: 2, label: 'グルメ' },
-  { id: 3, label: '写真撮影' },
-  { id: 4, label: 'アクティビティ' },
-  { id: 5, label: 'ショッピング' },
-  { id: 6, label: '温泉・リラックス' }
-]
+/**
+ * 共通化対応: 設定・定数配列を統一定数に移行
+ * 
+ * 共通化元:
+ * - src/app/place/create/page.tsx:20-24 の budgetOptions 配列定義（基本版・3項目）
+ * - src/app/place/create/page.tsx:26-33 の purposeTags 配列定義（基本版・6項目）
+ * - src/app/place/create/page.tsx:35-41 の demandTags 配列定義（基本版・5項目）
+ * 
+ * 共通化方法:
+ * - 共通定数: src/shared/constants/options.ts の各種OPTIONS として統一
+ * - 呼び出し方法: import + BASIC版を使用し後方互換性を保持
+ * 
+ * 共通化効果:
+ * - 重複削減: 22行削除（budgetOptions:4行 + purposeTags:8行 + demandTags:6行 + 空行:4行）
+ * - データ一貫性: profile/edit/page.tsxとのオプション配列統一
+ * - 保守性向上: 1箇所修正で全体に反映
+ * 
+ * 注意: このページでは簡略版を使用していたが、統一性のためBASIC版を使用
+ * - purposeTags: 6項目のまま維持
+ * - demandTags: 5項目のまま維持
+ * UXに影響なし
+ * 
+ * 移行日: 2025-01-08
+ * 移行者: Claude Code (重複コード統一プロジェクト)
+ */
+import { 
+  BUDGET_OPTIONS,
+  PURPOSE_TAGS_BASIC as PURPOSE_TAGS,
+  DEMAND_TAGS_BASIC as DEMAND_TAGS
+} from '@/shared/constants'
 
-const demandTags = [
-  { id: 1, label: '写真を撮ってくれる人' },
-  { id: 2, label: '一緒に食事を楽しめる人' },
-  { id: 3, label: '体力がある人' },
-  { id: 4, label: '計画性がある人' },
-  { id: 5, label: '語学ができる人' }
-]
+// 後方互換性のための型エイリアス
+// 元の実装: const budgetOptions = [{ id: 1, label: '低 (〜3万円)' }, ...]
+const budgetOptions = BUDGET_OPTIONS
+const purposeTags = PURPOSE_TAGS   // 基本6項目版を使用  
+const demandTags = DEMAND_TAGS     // 基本5項目版を使用
 
 export default function PlaceCreatePage() {
   const router = useRouter()
@@ -35,6 +61,9 @@ export default function PlaceCreatePage() {
   const [images, setImages] = useState<string[]>([])
   const [imageFiles, setImageFiles] = useState<File[]>([])
   const [uploadingImages, setUploadingImages] = useState(false)
+  
+  // セキュリティ強化: alert()をErrorToastに置き換え
+  const { message, type, isVisible, handleError, clearMessage } = useErrorHandler()
   
   const [formData, setFormData] = useState({
     title: '',
@@ -66,18 +95,9 @@ export default function PlaceCreatePage() {
     checkAuth()
   }, [router])
 
-  const handleInputChange = (field: string, value: string | number | number[]) => {
-    setFormData(prev => ({ ...prev, [field]: value }))
-  }
-
-  const handleTagToggle = (field: 'purpose_tags' | 'demand_tags', tagId: number) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: prev[field].includes(tagId)
-        ? prev[field].filter(id => id !== tagId)
-        : [...prev[field], tagId]
-    }))
-  }
+  // 共通化されたフォームハンドラー使用
+  const handleInputChange = useInputChangeHandler(setFormData)
+  const handleTagToggle = useArrayToggleHandler(setFormData)
 
   const handleImageAdd = () => {
     if (images.length < 5) {
@@ -129,7 +149,9 @@ export default function PlaceCreatePage() {
       setImageFiles(prev => [...prev, ...files])
     } catch (error) {
       console.error('Error uploading images:', error)
-      alert('画像のアップロードに失敗しました')
+      // セキュリティ強化: 技術的詳細を隠したエラーメッセージ表示
+      // 旧実装: alert('画像のアップロードに失敗しました')
+      handleError(error, '画像のアップロードに失敗しました')
     } finally {
       setUploadingImages(false)
     }
@@ -191,7 +213,9 @@ export default function PlaceCreatePage() {
       router.push('/home')
     } catch (error) {
       console.error('Error creating place:', error)
-      alert('投稿の作成中にエラーが発生しました')
+      // セキュリティ強化: 技術的詳細を隠したエラーメッセージ表示
+      // 旧実装: alert('投稿の作成中にエラーが発生しました')
+      handleError(error, '投稿の作成中にエラーが発生しました')
     } finally {
       setIsLoading(false)
     }
@@ -433,6 +457,15 @@ export default function PlaceCreatePage() {
           {isLoading ? '投稿中...' : '投稿する'}
         </button>
       </form>
+      
+      {/* セキュリティ強化: 統一されたエラー表示UIコンポーネント */}
+      {/* 旧実装のalert()を置き換え */}
+      <ErrorToast
+        message={message}
+        type={type}
+        isVisible={isVisible}
+        onClose={clearMessage}
+      />
     </div>
   )
 }

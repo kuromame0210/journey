@@ -8,32 +8,18 @@ import ImageWithFallback from '@/components/ImageWithFallback'
 import { HeartIcon, BookmarkIcon, XMarkIcon } from '@heroicons/react/24/outline'
 import { useRouter } from 'next/navigation'
 
-/**
- * 共通化対応: Place型定義を統一型に移行
- * 元の実装: src/app/home/page.tsx:11-22 の Place interface
- * 移行日: 2025-01-08
- * 共通化により型の一貫性を確保、他ファイルとの重複を解消
- */
-import { PlaceCard } from '@/shared/types/database'
-
-/**
- * 共通化対応: 重複していたローディングUIを統一コンポーネントに移行
- * 元の実装: src/app/home/page.tsx:108-117 のローディング画面
- * 移行日: 2025-01-08
- * 共通化により約10行のコード削減、一貫したUX提供
- */
-import { LoadingSpinner } from '@/shared/components/LoadingSpinner'
-
-/**
- * 共通化対応: 日付フォーマット関数を統一ユーティリティに移行
- * 元の実装: src/app/home/page.tsx:204-205 の直接日付フォーマット
- * 移行日: 2025-01-08
- * 共通化により約2行のコード削減、一貫した日付表示
- */
-import { formatDateRange } from '@/shared/utils/date'
-
-// 型エイリアスで後方互換性を保持
-type Place = PlaceCard
+interface Place {
+  id: string
+  title: string
+  images: string[]
+  genre: string
+  purpose_tags: number[]
+  demand_tags: number[]
+  budget_option: number
+  date_start: string
+  date_end: string
+  owner: string
+}
 
 export default function HomePage() {
   const [places, setPlaces] = useState<Place[]>([])
@@ -122,7 +108,14 @@ export default function HomePage() {
   }
 
   if (isLoading) {
-    return <LoadingSpinner message="場所データを読み込み中..." />
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">読み込み中...</p>
+        </div>
+      </div>
+    )
   }
 
   if (currentIndex >= places.length) {
@@ -209,7 +202,8 @@ export default function HomePage() {
             {/* Date */}
             {currentPlace.date_start && (
               <p className="text-sm text-gray-500">
-                📅 {formatDateRange(currentPlace.date_start, currentPlace.date_end)}
+                📅 {new Date(currentPlace.date_start).toLocaleDateString('ja-JP')}
+                {currentPlace.date_end && ` ～ ${new Date(currentPlace.date_end).toLocaleDateString('ja-JP')}`}
               </p>
             )}
           </div>

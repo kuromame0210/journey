@@ -5,55 +5,31 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import BottomNavigation from '@/components/BottomNavigation'
 
-/**
- * 共通化対応: ChatRoom型定義を統一型に移行
- * 元の実装: src/app/chat/page.tsx:8-26 の ChatRoom interface
- * 移行日: 2025-01-08
- * 共通化により型の一貫性を確保、他ファイルとの重複を解消
- */
-import { ChatRoomListItem } from '@/shared/types/database'
-
-/**
- * 共通化対応: 重複していたローディングUIを統一コンポーネントに移行
- * 元の実装: src/app/chat/page.tsx:93-102 のローディング画面
- * 移行日: 2025-01-08
- * 共通化により約10行のコード削減、一貫したUX提供
- */
-import { LoadingSpinner } from '@/shared/components/LoadingSpinner'
-
-/**
- * 共通化対応: 日付フォーマット関数を統一ユーティリティに移行
- * 元の実装: src/app/chat/page.tsx:74-91 の formatTime 関数
- * 移行日: 2025-01-08
- * 共通化により約18行のコード削減、一貫した日付表示
- */
-import { formatRelativeTime } from '@/shared/utils/date'
-
-/**
- * 共通化対応: 基本状態管理を統一フックに移行
- * 元の実装: src/app/chat/page.tsx:46-47 の user, isLoading useState
- * 移行日: 2025-01-08
- * 共通化により約2行のコード削減、状態管理の一貫性確保
- */
-import { useBasePageState } from '@/shared/hooks/useBasePageState'
-
-/**
- * 共通化対応: 認証処理を統一フックに移行
- * 元の実装: src/app/chat/page.tsx:42-52 の checkAuth 関数
- * 移行日: 2025-01-08
- * 共通化により約11行のコード削減、一貫した認証フロー (将来適用予定)
- */
-import { useAuth } from '@/shared/hooks/useAuth'
-
-// 後方互換性のための型エイリアス
-type ChatRoom = ChatRoomListItem
+interface ChatRoom {
+  id: string
+  place_id: string
+  user_a: string
+  user_b: string
+  created_at: string
+  place: {
+    title: string
+    images: string[]
+  }
+  other_user: {
+    name: string
+  }
+  latest_message: {
+    body: string
+    sent_at: string
+  } | null
+  unread_count: number
+}
 
 export default function ChatListPage() {
   const router = useRouter()
   const [chatRooms, setChatRooms] = useState<ChatRoom[]>([])
-  
-  // 統一された基本状態管理（元の個別useState実装を置換）
-  const { user, setUser, isLoading, setIsLoading, error, setError } = useBasePageState()
+  const [isLoading, setIsLoading] = useState(true)
+  const [user, setUser] = useState<{ id: string; email?: string } | null>(null)
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -96,9 +72,33 @@ export default function ChatListPage() {
     }
   }
 
+  const formatTime = (timestamp: string) => {
+    const date = new Date(timestamp)
+    const now = new Date()
+    const diffInMs = now.getTime() - date.getTime()
+    const diffInHours = diffInMs / (1000 * 60 * 60)
+    const diffInDays = diffInHours / 24
+
+    if (diffInHours < 1) {
+      return '今'
+    } else if (diffInHours < 24) {
+      return `${Math.floor(diffInHours)}時間前`
+    } else if (diffInDays < 7) {
+      return `${Math.floor(diffInDays)}日前`
+    } else {
+      return date.toLocaleDateString('ja-JP', { month: 'short', day: 'numeric' })
+    }
+  }
 
   if (isLoading) {
-    return <LoadingSpinner message="チャット履歴を読み込み中..." />
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">読み込み中...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -160,10 +160,10 @@ export default function ChatListPage() {
                     <div className="flex items-center space-x-2">
                       {room.latest_message && (
                         <span className="text-xs text-gray-500">
-                          {formatRelativeTime(room.latest_message.sent_at)}
+                          {formatTime(room.latest_message.sent_at)}
                         </span>
                       )}
-                      {(room.unread_count || 0) > 0 && (
+                      {room.unread_count > 0 && (
                         <div className="bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
                           {room.unread_count}
                         </div>

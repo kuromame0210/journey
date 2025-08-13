@@ -11,11 +11,18 @@ import {
   QuestionMarkCircleIcon,
   ArrowRightOnRectangleIcon
 } from '@heroicons/react/24/outline'
+// セキュリティ強化のためのエラーハンドリング統一
+// 参考: src/app/auth/page.tsx, src/app/auth/reset-password/page.tsx の改修に合わせて統一
+import ErrorToast from '@/components/ErrorToast'
+import useErrorHandler from '@/hooks/useErrorHandler'
 
 export default function SettingsPage() {
   const router = useRouter()
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
   const [isLoggingOut, setIsLoggingOut] = useState(false)
+  
+  // セキュリティ強化: alert()をErrorToastに置き換え
+  const { message, type, isVisible, handleError, showInfo, clearMessage } = useErrorHandler()
 
   const handleLogout = async () => {
     setIsLoggingOut(true)
@@ -41,6 +48,9 @@ export default function SettingsPage() {
       router.push('/auth')
     } catch (error) {
       console.error('Error signing out:', error)
+      // セキュリティ強化: 技術的詳細を隠したエラーメッセージ表示
+      // 旧実装: alert('ログアウトに失敗しました')
+      handleError(error, 'ログアウトに失敗しました')
       // エラーが発生してもローカルストレージをクリアして認証画面へ
       localStorage.clear()
       router.push('/auth')
@@ -62,21 +72,27 @@ export default function SettingsPage() {
       icon: BellIcon,
       title: '通知設定',
       description: 'プッシュ通知の設定',
-      action: () => alert('通知設定は後で実装予定です'),
+      // セキュリティ強化: alert()をshowInfo()に置き換え
+      // 旧実装: action: () => alert('通知設定は後で実装予定です'),
+      action: () => showInfo('通知設定は後で実装予定です'),
       showArrow: true
     },
     {
       icon: ShieldCheckIcon,
       title: 'プライバシー',
       description: 'プライバシーとセキュリティ',
-      action: () => alert('プライバシー設定は後で実装予定です'),
+      // セキュリティ強化: alert()をshowInfo()に置き換え
+      // 旧実装: action: () => alert('プライバシー設定は後で実装予定です'),
+      action: () => showInfo('プライバシー設定は後で実装予定です'),
       showArrow: true
     },
     {
       icon: QuestionMarkCircleIcon,
       title: 'ヘルプ・サポート',
       description: 'よくある質問とサポート',
-      action: () => alert('ヘルプページは後で実装予定です'),
+      // セキュリティ強化: alert()をshowInfo()に置き換え
+      // 旧実装: action: () => alert('ヘルプページは後で実装予定です'),
+      action: () => showInfo('ヘルプページは後で実装予定です'),
       showArrow: true
     }
   ]
@@ -180,6 +196,15 @@ export default function SettingsPage() {
           </div>
         </div>
       )}
+      
+      {/* セキュリティ強化: 統一されたエラー表示UIコンポーネント */}
+      {/* 旧実装のalert()を全て置き換え */}
+      <ErrorToast
+        message={message}
+        type={type}
+        isVisible={isVisible}
+        onClose={clearMessage}
+      />
     </div>
   )
 }
