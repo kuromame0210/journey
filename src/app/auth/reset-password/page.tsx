@@ -20,6 +20,8 @@ function ResetPasswordForm() {
 
   useEffect(() => {
     // URL からトークンを取得して検証
+    if (typeof window === 'undefined') return
+    
     const hashParams = new URLSearchParams(window.location.hash.substring(1))
     const accessToken = hashParams.get('access_token')
     const refreshToken = hashParams.get('refresh_token')

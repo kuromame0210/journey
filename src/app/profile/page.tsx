@@ -1,10 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import BottomNavigation from '@/components/BottomNavigation'
-import { PencilIcon, Cog6ToothIcon } from '@heroicons/react/24/outline'
+import { PencilIcon, Cog6ToothIcon, HeartIcon, BookmarkIcon, XMarkIcon } from '@heroicons/react/24/outline'
 
 /**
  * 共通化対応: 型定義を統一型に移行
@@ -35,6 +35,7 @@ type Place = PlaceListItem
 
 export default function ProfilePage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   
   // 統一された基本状態管理（元の個別useState実装を置換）
   const { user, setUser, isLoading, setIsLoading, error, setError } = useBasePageState()
@@ -42,6 +43,7 @@ export default function ProfilePage() {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [activeTab, setActiveTab] = useState<'posted' | 'liked' | 'kept' | 'passed'>('posted')
   const [places, setPlaces] = useState<Place[]>([])
+  const [placeReactions, setPlaceReactions] = useState<Record<string, string>>({})
 
   const [tabCounts, setTabCounts] = useState({
     posted: 0,
@@ -60,11 +62,16 @@ export default function ProfilePage() {
       setUser(session.user)
       fetchProfile(session.user.id)
       fetchAllCounts(session.user.id)
-      fetchPlaces(session.user.id, 'posted')
+      
+      // Check for tab parameter from URL
+      const tabParam = searchParams.get('tab') as 'posted' | 'liked' | 'kept' | 'passed'
+      const initialTab = tabParam && ['posted', 'liked', 'kept', 'passed'].includes(tabParam) ? tabParam : 'posted'
+      setActiveTab(initialTab)
+      fetchPlaces(session.user.id, initialTab)
     }
 
     checkAuth()
-  }, [router])
+  }, [router, searchParams])
 
   const fetchProfile = async (userId: string) => {
     try {
@@ -94,6 +101,28 @@ export default function ProfilePage() {
       
       if (type === 'posted') {
         query = query.eq('owner', userId)
+        
+        // Get reactions for own posts to show current status
+        const { data: placesData, error } = await query.order('created_at', { ascending: false })
+        if (error) throw error
+        
+        const placeIds = placesData?.map(p => p.id) || []
+        if (placeIds.length > 0) {
+          const { data: reactionsData } = await supabase
+            .from('reactions')
+            .select('place_id, type')
+            .eq('from_uid', userId)
+            .in('place_id', placeIds)
+          
+          const reactionMap: Record<string, string> = {}
+          reactionsData?.forEach(r => {
+            reactionMap[r.place_id] = r.type
+          })
+          setPlaceReactions(reactionMap)
+        }
+        
+        setPlaces(placesData || [])
+        return
       } else {
         // For reactions, we'd need to join with reactions table
         const { data: reactionData, error: reactionError } = await supabase
@@ -110,7 +139,8 @@ export default function ProfilePage() {
           return
         }
         
-        query = query.in('id', placeIds)
+        // Exclude own posts from reaction lists
+        query = query.in('id', placeIds).neq('owner', userId)
       }
       
       const { data, error } = await query.order('created_at', { ascending: false })
@@ -131,11 +161,15 @@ export default function ProfilePage() {
         .select('*', { count: 'exact', head: true })
         .eq('owner', userId)
 
-      // リアクション数を取得
+      // リアクション数を取得（自分の投稿を除外）
       const { data: reactions } = await supabase
         .from('reactions')
-        .select('type')
+        .select(`
+          type,
+          places!inner(owner)
+        `)
         .eq('from_uid', userId)
+        .neq('places.owner', userId)
 
       const likedCount = reactions?.filter(r => r.type === 'like').length || 0
       const keptCount = reactions?.filter(r => r.type === 'keep').length || 0
@@ -162,6 +196,53 @@ export default function ProfilePage() {
 
   const handleSettingsClick = () => {
     router.push('/settings')
+  }
+
+  const handleReactionChange = async (placeId: string, newReactionType: 'like' | 'keep' | 'pass') => {
+    if (!user) return
+
+    try {
+      // Try upsert first
+      const { error } = await supabase
+        .from('reactions')
+        .upsert({
+          place_id: placeId,
+          from_uid: user.id,
+          type: newReactionType
+        })
+
+      if (error) {
+        // If duplicate key error, try update instead
+        if (error.code === '23505') {
+          console.log('Duplicate detected, updating existing reaction...')
+          const { error: updateError } = await supabase
+            .from('reactions')
+            .update({ type: newReactionType })
+            .eq('place_id', placeId)
+            .eq('from_uid', user.id)
+          
+          if (updateError) throw updateError
+        } else {
+          throw error
+        }
+      }
+
+      // Update local reaction state for immediate UI feedback
+      if (activeTab === 'posted') {
+        setPlaceReactions(prev => ({
+          ...prev,
+          [placeId]: newReactionType
+        }))
+      }
+
+      // Refresh current tab and update counts
+      if (user) {
+        await fetchAllCounts(user.id)
+        await fetchPlaces(user.id, activeTab)
+      }
+    } catch (error) {
+      console.error('Error updating reaction:', error)
+    }
   }
 
   if (isLoading) {
@@ -373,27 +454,85 @@ export default function ProfilePage() {
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-4">
               {places.map((place) => (
                 <div
                   key={place.id}
-                  className="bg-white rounded-lg shadow-sm overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
-                  onClick={() => router.push(`/place/${place.id}`)}
+                  className="bg-white rounded-lg shadow-sm overflow-hidden"
                 >
-                  <div className="aspect-[4/3]">
-                    <img
-                      src={place.images[0]}
-                      alt={place.title}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                  <div className="p-3">
-                    <h3 className="font-medium text-gray-900 text-sm truncate">
-                      {place.title}
-                    </h3>
-                    <p className="text-xs text-gray-500 mt-1">
-                      {place.genre}
-                    </p>
+                  <div className="flex">
+                    {/* Image */}
+                    <div 
+                      className="w-24 h-24 flex-shrink-0 cursor-pointer"
+                      onClick={() => router.push(`/place/${place.id}?from=profile&tab=${activeTab}`)}
+                    >
+                      <img
+                        src={place.images?.[0] || '/placeholder.jpg'}
+                        alt={place.title}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    
+                    {/* Content */}
+                    <div className="flex-1 p-3 flex flex-col justify-between">
+                      <div 
+                        className="cursor-pointer"
+                        onClick={() => router.push(`/place/${place.id}?from=profile&tab=${activeTab}`)}
+                      >
+                        <h3 className="font-medium text-gray-900 text-sm truncate">
+                          {place.title}
+                        </h3>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {place.genre}
+                        </p>
+                      </div>
+                      
+                      {/* Reaction Buttons */}
+                      <div className="flex space-x-2 mt-2">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleReactionChange(place.id, 'like')
+                            }}
+                            className={`p-1 rounded-full text-xs ${
+                              (activeTab === 'liked') || (activeTab === 'posted' && placeReactions[place.id] === 'like')
+                                ? 'bg-green-100 text-green-600' 
+                                : 'bg-gray-100 text-gray-600 hover:bg-green-100 hover:text-green-600'
+                            }`}
+                            title="行きたい"
+                          >
+                            <HeartIcon className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleReactionChange(place.id, 'keep')
+                            }}
+                            className={`p-1 rounded-full text-xs ${
+                              (activeTab === 'kept') || (activeTab === 'posted' && placeReactions[place.id] === 'keep')
+                                ? 'bg-yellow-100 text-yellow-600' 
+                                : 'bg-gray-100 text-gray-600 hover:bg-yellow-100 hover:text-yellow-600'
+                            }`}
+                            title="キープ"
+                          >
+                            <BookmarkIcon className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleReactionChange(place.id, 'pass')
+                            }}
+                            className={`p-1 rounded-full text-xs ${
+                              (activeTab === 'passed') || (activeTab === 'posted' && placeReactions[place.id] === 'pass')
+                                ? 'bg-red-100 text-red-600' 
+                                : 'bg-gray-100 text-gray-600 hover:bg-red-100 hover:text-red-600'
+                            }`}
+                            title="興味ない"
+                          >
+                            <XMarkIcon className="h-4 w-4" />
+                          </button>
+                        </div>
+                    </div>
                   </div>
                 </div>
               ))}

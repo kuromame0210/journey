@@ -63,10 +63,29 @@ export default function HomePage() {
 
   const fetchPlacesWithUser = async (currentUser: { id: string; email?: string }) => {
     try {
-      const { data, error } = await supabase
+      // First, get all place IDs that the user has already reacted to
+      const { data: reactedPlaceIds, error: reactionError } = await supabase
+        .from('reactions')
+        .select('place_id')
+        .eq('from_uid', currentUser.id)
+
+      if (reactionError) throw reactionError
+
+      // Extract place IDs from reactions
+      const excludePlaceIds = reactedPlaceIds?.map(r => r.place_id) || []
+
+      // Query places excluding own posts and already reacted places
+      let query = supabase
         .from('places')
         .select('*')
         .neq('owner', currentUser.id)
+
+      // Exclude places that user has already reacted to
+      if (excludePlaceIds.length > 0) {
+        query = query.not('id', 'in', `(${excludePlaceIds.join(',')})`)
+      }
+
+      const { data, error } = await query
         .order('created_at', { ascending: false })
         .limit(30)
 
@@ -86,27 +105,34 @@ export default function HomePage() {
     const currentPlace = places[currentIndex]
 
     try {
+      // Try upsert first
       const { error } = await supabase
         .from('reactions')
         .upsert({
           place_id: currentPlace.id,
           from_uid: user.id,
           type: type
-        }, {
-          onConflict: 'place_id,from_uid'
         })
 
       if (error) {
-        console.error('Error saving reaction:', error)
-        // 409エラーでも次のカードに進む
-        if (error.code === '23505' || error.message.includes('duplicate')) {
-          console.log('Reaction already exists, updating...')
+        // If duplicate key error, try update instead
+        if (error.code === '23505') {
+          console.log('Duplicate detected, updating existing reaction...')
+          const { error: updateError } = await supabase
+            .from('reactions')
+            .update({ type: type })
+            .eq('place_id', currentPlace.id)
+            .eq('from_uid', user.id)
+          
+          if (updateError) {
+            console.error('Error updating reaction:', updateError)
+          }
         } else {
-          throw error
+          console.error('Error saving reaction:', error)
         }
       }
 
-      // Move to next card
+      // Move to next card regardless of error (UX priority)
       setCurrentIndex(prev => prev + 1)
     } catch (error) {
       console.error('Error saving reaction:', error)
@@ -117,7 +143,7 @@ export default function HomePage() {
 
   const handleCardClick = () => {
     if (currentIndex < places.length) {
-      router.push(`/place/${places[currentIndex].id}`)
+      router.push(`/place/${places[currentIndex].id}?from=home`)
     }
   }
 

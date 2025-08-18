@@ -100,7 +100,7 @@ export default function PlaceCreatePage() {
   const handleTagToggle = useArrayToggleHandler(setFormData)
 
   const handleImageAdd = () => {
-    if (images.length < 5) {
+    if (images.length < 5 && typeof document !== 'undefined') {
       const input = document.createElement('input')
       input.type = 'file'
       input.accept = 'image/*'

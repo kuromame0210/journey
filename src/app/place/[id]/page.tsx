@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { ArrowLeftIcon, MapPinIcon, CalendarDaysIcon, UserGroupIcon, HeartIcon, BookmarkIcon, XMarkIcon } from '@heroicons/react/24/outline'
 // セキュリティ強化のためのエラーハンドリング統一
@@ -39,6 +39,7 @@ type Place = PlaceDetail
 export default function PlaceDetailPage() {
   const params = useParams()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [place, setPlace] = useState<Place | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [user, setUser] = useState<{ id: string; email?: string } | null>(null)
@@ -87,6 +88,7 @@ export default function PlaceDetailPage() {
     if (!user || !place) return
 
     try {
+      // Try upsert first
       const { error } = await supabase
         .from('reactions')
         .upsert({
@@ -95,10 +97,31 @@ export default function PlaceDetailPage() {
           type: type
         })
 
-      if (error) throw error
+      if (error) {
+        // If duplicate key error, try update instead
+        if (error.code === '23505') {
+          console.log('Duplicate detected, updating existing reaction...')
+          const { error: updateError } = await supabase
+            .from('reactions')
+            .update({ type: type })
+            .eq('place_id', place.id)
+            .eq('from_uid', user.id)
+          
+          if (updateError) throw updateError
+        } else {
+          throw error
+        }
+      }
       
-      // Navigate back to home
-      router.push('/home')
+      // Navigate back based on where user came from
+      const fromParam = searchParams.get('from')
+      const tabParam = searchParams.get('tab')
+      
+      if (fromParam === 'profile' && tabParam) {
+        router.push(`/profile?tab=${tabParam}`)
+      } else {
+        router.push('/home')
+      }
     } catch (error) {
       console.error('Error saving reaction:', error)
       // セキュリティ強化: 技術的詳細を隠したエラーメッセージ表示
