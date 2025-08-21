@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import BottomNavigation from '@/components/BottomNavigation'
@@ -33,7 +33,7 @@ import { useBasePageState } from '@/shared/hooks/useBasePageState'
 // 後方互換性のための型エイリアス
 type Place = PlaceListItem
 
-export default function ProfilePage() {
+function ProfilePageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   
@@ -543,5 +543,13 @@ export default function ProfilePage() {
 
       <BottomNavigation />
     </div>
+  )
+}
+
+export default function ProfilePage() {
+  return (
+    <Suspense fallback={<LoadingSpinner message="プロフィールページを読み込み中..." />}>
+      <ProfilePageContent />
+    </Suspense>
   )
 }
