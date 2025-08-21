@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git commit:*)",
+      "Bash(psql:*)",
+      "Bash(nslookup:*)",
+      "WebFetch(domain:fgpsfokijrpiafrlfyxv.supabase.co)",
+      "Bash(curl:*)",
+      "Bash(grep:*)",
+      "Bash(git add:*)",
+      "Bash(mkdir:*)",
+      "Bash(mv:*)"
+    ],
+    "deny": []
+  }
+}
