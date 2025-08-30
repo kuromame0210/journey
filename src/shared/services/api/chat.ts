@@ -59,7 +59,7 @@ export async function fetchChatRoomsList(userId: string): Promise<ChatRoomListIt
         // 相手ユーザー情報を取得
         const { data: otherUser } = await supabase
           .from('profiles')
-          .select('id, name')
+          .select('id, name, avatar_url')
           .eq('id', otherUserId)
           .single();
 
@@ -94,7 +94,8 @@ export async function fetchChatRoomsList(userId: string): Promise<ChatRoomListIt
           },
           other_user: {
             id: otherUser?.id || otherUserId,
-            name: otherUser?.name || '不明なユーザー'
+            name: otherUser?.name || '不明なユーザー',
+            avatar_url: otherUser?.avatar_url || null
           },
           latest_message: latestMessage ? {
             body: latestMessage.body,
@@ -154,7 +155,7 @@ export async function fetchChatRoomDetail(roomId: string, userId: string): Promi
     // 相手ユーザー情報を取得
     const { data: otherUser } = await supabase
       .from('profiles')
-      .select('id, name')
+      .select('id, name, avatar_url')
       .eq('id', otherUserId)
       .single();
 
@@ -169,7 +170,8 @@ export async function fetchChatRoomDetail(roomId: string, userId: string): Promi
       },
       other_user: {
         id: otherUser?.id || otherUserId,
-        name: otherUser?.name || '不明なユーザー'
+        name: otherUser?.name || '不明なユーザー',
+        avatar_url: otherUser?.avatar_url || null
       }
     };
   } catch (error) {

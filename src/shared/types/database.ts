@@ -82,10 +82,12 @@ export interface ChatRoom {
     date_start: string | null;
     date_end: string | null;
     images: string[];
+    recruit_num?: number | null;
   };
   other_user?: {
     id: string;
     name: string | null;
+    avatar_url: string | null;
   };
   latest_message?: {
     body: string;
@@ -139,7 +141,11 @@ export type PlaceDetail = Place;
 // チャット関連の用途別型
 export type ChatRoomListItem = Pick<ChatRoom, 'id' | 'place_id' | 'user_a' | 'user_b' | 'created_at'> & {
   place: NonNullable<ChatRoom['place']>;
-  other_user: NonNullable<ChatRoom['other_user']>;
+  other_user: {
+    id: string;
+    name: string | null;
+    avatar_url: string | null;
+  };
   latest_message?: ChatRoom['latest_message'];
   unread_count?: number;
 };
@@ -150,9 +156,11 @@ export type ChatRoomDetail = Pick<ChatRoom, 'id' | 'place_id'> & {
     date_start: string | null;
     date_end: string | null;
     images: string[];
+    recruit_num?: number | null;
   };
   other_user: {
     id: string;
     name: string | null;
+    avatar_url: string | null;
   };
 };

@@ -82,9 +82,10 @@ export default function ChatRoomPage() {
         .eq('id', otherUserId)
         .single()
       
-      // チャットルームデータにother_user情報を追加
+      // チャットルームデータにother_user情報を追加し、placesをplaceにマッピング
       const enhancedRoomData = {
         ...roomData,
+        place: roomData.places,
         other_user: otherUserProfile || { 
           id: otherUserId, 
           name: 'Unknown User', 
@@ -383,8 +384,8 @@ export default function ChatRoomPage() {
           {/* Place Image */}
           <div className="flex-shrink-0">
             <img
-              src={chatRoom.places?.images?.[0] || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZGRkIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzk5OSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPk5vIEltYWdlPC90ZXh0Pjwvc3ZnPg=='}
-              alt={chatRoom.places?.title || 'Place'}
+              src={chatRoom.place?.images?.[0] || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZGRkIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzk5OSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPk5vIEltYWdlPC90ZXh0Pjwvc3ZnPg=='}
+              alt={chatRoom.place?.title || 'Place'}
               className="w-10 h-10 rounded-lg object-cover"
             />
           </div>
@@ -393,18 +394,18 @@ export default function ChatRoomPage() {
           <div className="flex-1 min-w-0">
             {/* Place Title (Primary) */}
             <h2 className="font-semibold text-gray-900 text-base truncate">
-              {chatRoom.places?.title || '場所未設定'}
+              {chatRoom.place?.title || '場所未設定'}
             </h2>
             {/* Names & Date Info (Secondary) */}
             <div className="flex items-center space-x-2 mt-0.5">
               <p className="text-sm text-gray-600">
                 {userProfile?.name || '名前未設定'} ⇄ {chatRoom.other_user?.name || '名前未設定'}
               </p>
-              {chatRoom.places?.date_start && (
+              {chatRoom.place?.date_start && (
                 <>
                   <span className="text-gray-400">•</span>
                   <p className="text-xs text-gray-500">
-                    📅 {formatDateRange(chatRoom.places.date_start, chatRoom.places.date_end)}
+                    📅 {formatDateRange(chatRoom.place.date_start, chatRoom.place.date_end)}
                   </p>
                 </>
               )}

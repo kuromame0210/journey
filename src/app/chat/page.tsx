@@ -118,7 +118,7 @@ export default function ChatListPage() {
       // 場所情報を一括取得
       const { data: placesData } = await supabase
         .from('places')
-        .select('id, title, images, date_start, date_end')
+        .select('id, title, images, date_start, date_end, recruit_num')
         .in('id', Array.from(placeIds))
       
       // 最新メッセージを一括取得
@@ -177,7 +177,8 @@ export default function ChatListPage() {
             title: 'Unknown Place',
             images: [],
             date_start: null,
-            date_end: null
+            date_end: null,
+            recruit_num: null
           }
           
           const latestMessage = latestMessagesMap.get(room.id) || null

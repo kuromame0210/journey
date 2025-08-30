@@ -61,7 +61,7 @@ export const useUserProfile = (userId?: string): UseUserProfileReturn => {
           setUserProfile({
             id: targetUserId,
             name: '名前未設定',
-            avatar_url: null
+            avatar_url: undefined
           })
         } else {
           throw fetchError
@@ -81,7 +81,7 @@ export const useUserProfile = (userId?: string): UseUserProfileReturn => {
       setUserProfile({
         id: targetUserId,
         name: '名前未設定',
-        avatar_url: null
+        avatar_url: undefined
       })
     } finally {
       setIsLoading(false)
