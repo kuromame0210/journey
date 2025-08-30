@@ -32,6 +32,7 @@ import { LoadingSpinner } from '@/shared/components/LoadingSpinner'
  * 共通化により約13行のコード削減、一貫した日付表示
  */
 import { formatTime, formatMessageDate, formatDateRange } from '@/shared/utils/date'
+import { useUserProfile } from '@/shared/hooks/useUserProfile'
 
 // 後方互換性のための型エイリアス
 type ChatRoom = ChatRoomDetail
@@ -44,10 +45,21 @@ export default function ChatRoomPage() {
   const [chatRoom, setChatRoom] = useState<ChatRoom | null>(null)
   const [user, setUser] = useState<{ id: string; email?: string } | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [lastKeyPress, setLastKeyPress] = useState<number>(0)
+  const [isComposing, setIsComposing] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   
   // セキュリティ強化: alert()をErrorToastに置き換え
   const { message, type, isVisible, handleError, clearMessage } = useErrorHandler()
+  
+  /**
+   * 共通化対応: ユーザープロフィール取得
+   * 
+   * 従来の fetchUserProfile 関数を共通フック useUserProfile に移行
+   * - 重複コード 18行削除
+   * - 一覧画面との実装統一
+   */
+  const { userProfile } = useUserProfile(user?.id)
 
   const fetchChatRoom = async (userId: string) => {
     try {
@@ -61,7 +73,26 @@ export default function ChatRoomPage() {
         .single()
       
       if (roomError) throw roomError
-      setChatRoom(roomData)
+      
+      // 相手ユーザーのプロフィール情報を取得
+      const otherUserId = roomData.user_a === userId ? roomData.user_b : roomData.user_a
+      const { data: otherUserProfile } = await supabase
+        .from('profiles')
+        .select('id, name, avatar_url')
+        .eq('id', otherUserId)
+        .single()
+      
+      // チャットルームデータにother_user情報を追加
+      const enhancedRoomData = {
+        ...roomData,
+        other_user: otherUserProfile || { 
+          id: otherUserId, 
+          name: 'Unknown User', 
+          avatar_url: null 
+        }
+      }
+      
+      setChatRoom(enhancedRoomData)
       
       const { data: messagesData, error: messagesError } = await supabase
         .from('messages')
@@ -92,9 +123,126 @@ export default function ChatRoomPage() {
     checkAuth()
   }, [params.id, router])
 
+  // リアルタイム機能: 新しいメッセージを受信
+  useEffect(() => {
+    if (!chatRoom) return
+
+    console.log('Setting up realtime subscription for room:', chatRoom.id)
+    
+    // Supabase Realtimeチャンネルを設定
+    const channel = supabase
+      .channel(`messages:${chatRoom.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: `room_id=eq.${chatRoom.id}`
+        },
+        (payload) => {
+          console.log('New message received:', payload)
+          const newMessage = payload.new as Message
+          
+          // 自分が送信したメッセージは既にローカル状態に反映済みなのでスキップ
+          if (newMessage.sender === user?.id) {
+            return
+          }
+          
+          // 他のユーザーからの新しいメッセージをローカル状態に追加
+          setMessages(prev => {
+            // より厳密な重複チェック（IDとbodyの両方で確認）
+            const exists = prev.some(msg => 
+              msg.id === newMessage.id || 
+              (msg.body === newMessage.body && msg.sender === newMessage.sender && Math.abs(new Date(msg.sent_at).getTime() - new Date(newMessage.sent_at).getTime()) < 5000)
+            )
+            if (exists) {
+              console.log('Duplicate message detected, skipping:', newMessage.id)
+              return prev
+            }
+            return [...prev, newMessage]
+          })
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'messages',
+          filter: `room_id=eq.${chatRoom.id}`
+        },
+        (payload) => {
+          console.log('Message updated:', payload)
+          const updatedMessage = payload.new as Message
+          
+          // メッセージの既読ステータス更新などに対応
+          setMessages(prev => 
+            prev.map(msg => 
+              msg.id === updatedMessage.id ? { ...msg, ...updatedMessage } : msg
+            )
+          )
+        }
+      )
+      .subscribe((status) => {
+        console.log('Realtime subscription status:', status)
+      })
+
+    // クリーンアップ関数
+    return () => {
+      console.log('Cleaning up realtime subscription')
+      supabase.removeChannel(channel)
+    }
+  }, [chatRoom, user])
+
   useEffect(() => {
     scrollToBottom()
   }, [messages])
+
+  // 既読機能: チャット画面を開いたとき、相手からのメッセージを既読にする
+  useEffect(() => {
+    if (!user || !chatRoom || !messages.length) return
+
+    const markMessagesAsRead = async () => {
+      try {
+        // 相手から受信した未読メッセージを取得
+        const unreadMessages = messages.filter(msg => 
+          msg.sender !== user.id && msg.is_read === false
+        )
+
+        if (unreadMessages.length === 0) return
+
+        // 未読メッセージを既読にマーク
+        const { error } = await supabase
+          .from('messages')
+          .update({ is_read: true })
+          .in('id', unreadMessages.map(msg => msg.id))
+
+        if (error) {
+          console.error('Error marking messages as read:', error)
+          return
+        }
+
+        // ローカル状態も更新
+        setMessages(prev => 
+          prev.map(msg => 
+            unreadMessages.some(unread => unread.id === msg.id) 
+              ? { ...msg, is_read: true }
+              : msg
+          )
+        )
+
+        console.log(`Marked ${unreadMessages.length} messages as read`)
+      } catch (error) {
+        console.error('Error in markMessagesAsRead:', error)
+      }
+    }
+
+    // 画面を開いてから少し遅らせて既読処理を実行（Realtimeとの競合を避けるため）
+    const timer = setTimeout(markMessagesAsRead, 500)
+    
+    return () => clearTimeout(timer)
+  }, [messages, user, chatRoom])
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -103,31 +251,97 @@ export default function ChatRoomPage() {
   const sendMessage = async () => {
     if (!newMessage.trim() || !user || !chatRoom) return
 
+    // UUIDを生成してローカル状態を即座に更新（楽観的UI）
+    const tempId = crypto.randomUUID()
     const messageData: Message = {
-      id: Date.now().toString(),
+      id: tempId,
       room_id: chatRoom.id,
       sender: user.id,
       body: newMessage.trim(),
       sent_at: new Date().toISOString()
     }
 
+    // 即座にUIを更新（楽観的更新）
+    setMessages(prev => [...prev, messageData])
+    const originalMessage = newMessage
+    setNewMessage('')
+
     try {
-      // In a real app, you'd save to Supabase here
-      setMessages(prev => [...prev, messageData])
-      setNewMessage('')
+      // Supabaseにメッセージを保存
+      const { data, error } = await supabase
+        .from('messages')
+        .insert({
+          room_id: chatRoom.id,
+          sender: user.id,
+          body: messageData.body,
+          sent_at: messageData.sent_at,
+          is_read: false // 新しいメッセージは未読状態
+        })
+        .select()
+        .single()
+
+      if (error) throw error
+
+      // 実際に保存されたデータでローカル状態を更新
+      setMessages(prev => prev.map(msg => 
+        msg.id === tempId ? { ...data, id: data.id } : msg
+      ))
+
     } catch (error) {
       console.error('Error sending message:', error)
+      
+      // エラー時は楽観的更新をロールバック
+      setMessages(prev => prev.filter(msg => msg.id !== tempId))
+      setNewMessage(originalMessage) // メッセージを復元
+      
       // セキュリティ強化: 技術的詳細を隠したエラーメッセージ表示
       // 旧実装: alert('メッセージの送信に失敗しました')
       handleError(error, 'メッセージの送信に失敗しました')
     }
   }
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      sendMessage()
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      if (e.shiftKey) {
+        // Shift+Enterは改行（デフォルト動作を許可）
+        return
+      }
+      
+      console.log('Enter pressed, isComposing:', isComposing)
+      
+      if (!isComposing) {
+        // IME無効（半角英数字など）→ 1回のEnterで送信
+        console.log('Direct input mode, sending message immediately')
+        e.preventDefault()
+        sendMessage()
+      } else {
+        // IME有効（変換候補がある）→ 2回のEnterで送信
+        const now = Date.now()
+        console.log('Composition mode, last press was:', now - lastKeyPress, 'ms ago')
+        
+        if (now - lastKeyPress < 500) {
+          console.log('Double enter detected in composition mode, sending message')
+          e.preventDefault()
+          sendMessage()
+          setLastKeyPress(0) // リセット
+        } else {
+          // 1回目のEnterは記録するのみ（確定処理）
+          console.log('First enter in composition mode, confirming text')
+          setLastKeyPress(now)
+          // 確定処理はデフォルト動作に任せる
+        }
+      }
     }
+  }
+
+  const handleCompositionStart = () => {
+    console.log('Composition started')
+    setIsComposing(true)
+  }
+
+  const handleCompositionEnd = () => {
+    console.log('Composition ended')
+    setIsComposing(false)
   }
 
 
@@ -163,16 +377,38 @@ export default function ChatRoomPage() {
         </button>
         
         <div 
-          className="flex-1 cursor-pointer"
+          className="flex-1 cursor-pointer flex items-center space-x-3"
           onClick={() => router.push(`/place/${chatRoom.place_id}`)}
         >
-          <div className="bg-blue-50 rounded-lg p-3">
-            <h2 className="font-medium text-gray-900 text-sm">
-              {chatRoom.other_user.name} さんとの {chatRoom.place.title}
+          {/* Place Image */}
+          <div className="flex-shrink-0">
+            <img
+              src={chatRoom.places?.images?.[0] || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZGRkIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzk5OSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPk5vIEltYWdlPC90ZXh0Pjwvc3ZnPg=='}
+              alt={chatRoom.places?.title || 'Place'}
+              className="w-10 h-10 rounded-lg object-cover"
+            />
+          </div>
+          
+          {/* Place Info */}
+          <div className="flex-1 min-w-0">
+            {/* Place Title (Primary) */}
+            <h2 className="font-semibold text-gray-900 text-base truncate">
+              {chatRoom.places?.title || '場所未設定'}
             </h2>
-            <p className="text-xs text-gray-600 mt-1">
-              📅 {formatDateRange(chatRoom.place.date_start, chatRoom.place.date_end)}
-            </p>
+            {/* Names & Date Info (Secondary) */}
+            <div className="flex items-center space-x-2 mt-0.5">
+              <p className="text-sm text-gray-600">
+                {userProfile?.name || '名前未設定'} ⇄ {chatRoom.other_user?.name || '名前未設定'}
+              </p>
+              {chatRoom.places?.date_start && (
+                <>
+                  <span className="text-gray-400">•</span>
+                  <p className="text-xs text-gray-500">
+                    📅 {formatDateRange(chatRoom.places.date_start, chatRoom.places.date_end)}
+                  </p>
+                </>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -197,7 +433,31 @@ export default function ChatRoomPage() {
 
               {/* Message */}
               <div className={`flex ${isMyMessage ? 'justify-end' : 'justify-start'}`}>
+                {/* 相手のアバター（左側） */}
+                {!isMyMessage && (
+                  <div className="flex-shrink-0 mr-2">
+                    {chatRoom?.other_user?.avatar_url ? (
+                      <img
+                        src={chatRoom.other_user.avatar_url}
+                        alt={chatRoom.other_user.name || 'User'}
+                        className="w-8 h-8 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-8 h-8 bg-gradient-to-br from-gray-400 to-gray-500 rounded-full flex items-center justify-center text-white text-xs font-bold">
+                        {chatRoom?.other_user?.name?.charAt(0) || '?'}
+                      </div>
+                    )}
+                  </div>
+                )}
+                
                 <div className={`max-w-[70%] ${isMyMessage ? 'order-2' : 'order-1'}`}>
+                  {/* 相手の名前（相手のメッセージの場合のみ） */}
+                  {!isMyMessage && (
+                    <p className="text-xs text-gray-500 mb-1 ml-1">
+                      {chatRoom?.other_user?.name || 'Unknown User'}
+                    </p>
+                  )}
+                  
                   <div
                     className={`px-4 py-2 rounded-2xl ${
                       isMyMessage
@@ -209,10 +469,11 @@ export default function ChatRoomPage() {
                       {message.body}
                     </p>
                   </div>
-                  <p className={`text-xs text-gray-500 mt-1 ${isMyMessage ? 'text-right' : 'text-left'}`}>
+                  <p className={`text-xs text-gray-500 mt-1 ${isMyMessage ? 'text-right' : 'text-left'} ${!isMyMessage ? 'ml-1' : ''}`}>
                     {formatTime(message.sent_at)}
                   </p>
                 </div>
+                
               </div>
             </div>
           )
@@ -231,7 +492,9 @@ export default function ChatRoomPage() {
             <textarea
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
-              onKeyDown={handleKeyPress}
+              onKeyDown={handleKeyDown}
+              onCompositionStart={handleCompositionStart}
+              onCompositionEnd={handleCompositionEnd}
               placeholder="メッセージを入力..."
               rows={1}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"

@@ -5,6 +5,8 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import BottomNavigation from '@/components/BottomNavigation'
 import { PencilIcon, Cog6ToothIcon, HeartIcon, BookmarkIcon, XMarkIcon } from '@heroicons/react/24/outline'
+import HelpIcon from '@/components/HelpIcon'
+import ContextHint from '@/components/ContextHint'
 
 /**
  * 共通化対応: 型定義を統一型に移行
@@ -227,6 +229,14 @@ function ProfilePageContent() {
         }
       }
 
+      // 相互いいね判定とチャットルーム自動作成（typeが'like'の場合のみ）
+      if (newReactionType === 'like') {
+        const place = places.find(p => p.id === placeId)
+        if (place) {
+          await checkMutualLikeAndCreateChatRoom(place, user)
+        }
+      }
+
       // Update local reaction state for immediate UI feedback
       if (activeTab === 'posted') {
         setPlaceReactions(prev => ({
@@ -242,6 +252,82 @@ function ProfilePageContent() {
       }
     } catch (error) {
       console.error('Error updating reaction:', error)
+    }
+  }
+
+  /**
+   * 相互いいね判定とチャットルーム自動作成
+   */
+  const checkMutualLikeAndCreateChatRoom = async (place: { id: string; owner: string }, currentUser: { id: string; email?: string }) => {
+    try {
+      // 現在のユーザーの投稿を取得
+      const { data: currentUserPlaces, error: placesError } = await supabase
+        .from('places')
+        .select('id')
+        .eq('owner', currentUser.id)
+
+      if (placesError) {
+        console.error('Error fetching current user places:', placesError)
+        return
+      }
+
+      if (!currentUserPlaces || currentUserPlaces.length === 0) {
+        return // 現在のユーザーが投稿していない場合は相互いいね不可
+      }
+
+      // 投稿者が現在のユーザーの投稿にいいねしているかチェック
+      const { data: mutualReaction, error: mutualError } = await supabase
+        .from('reactions')
+        .select('*')
+        .eq('from_uid', place.owner)
+        .eq('type', 'like')
+        .in('place_id', currentUserPlaces.map(p => p.id))
+
+      if (mutualError) {
+        console.error('Error checking mutual reaction:', mutualError)
+        return
+      }
+
+      // 相互いいねが成立している場合
+      if (mutualReaction && mutualReaction.length > 0) {
+        console.log('Mutual like detected! Creating chat room...')
+        
+        // 既存のチャットルームをチェック（同じ場所・同じユーザーペア）
+        const { data: existingRoom, error: roomCheckError } = await supabase
+          .from('chat_rooms')
+          .select('id')
+          .eq('place_id', place.id)
+          .or(`and(user_a.eq.${currentUser.id},user_b.eq.${place.owner}),and(user_a.eq.${place.owner},user_b.eq.${currentUser.id})`)
+
+        if (roomCheckError) {
+          console.error('Error checking existing chat room:', roomCheckError)
+          return
+        }
+
+        // チャットルームが存在しない場合のみ作成
+        if (!existingRoom || existingRoom.length === 0) {
+          const { data: newRoom, error: createRoomError } = await supabase
+            .from('chat_rooms')
+            .insert({
+              place_id: place.id,
+              user_a: currentUser.id,
+              user_b: place.owner
+            })
+            .select()
+            .single()
+
+          if (createRoomError) {
+            console.error('Error creating chat room:', createRoomError)
+            return
+          }
+
+          console.log('Chat room created successfully:', newRoom.id)
+        } else {
+          console.log('Chat room already exists:', existingRoom[0].id)
+        }
+      }
+    } catch (error) {
+      console.error('Error in mutual like check:', error)
     }
   }
 
@@ -281,12 +367,32 @@ function ProfilePageContent() {
       {/* Header */}
       <div className="bg-white px-4 py-3 flex items-center justify-between shadow-sm">
         <h1 className="text-xl font-bold text-gray-900">マイページ</h1>
-        <button
-          onClick={handleSettingsClick}
-          className="p-2"
-        >
-          <Cog6ToothIcon className="h-6 w-6 text-gray-600" />
-        </button>
+        <div className="flex items-center space-x-2">
+          <HelpIcon
+            title="プロフィールについて"
+            content={
+              <div className="space-y-3">
+                <p>👤 <strong>プロフィール機能</strong></p>
+                <div className="space-y-2 text-sm">
+                  <p>• 自己紹介と写真でアピールしましょう</p>
+                  <p>• 投稿した場所が一覧で確認できます</p>
+                  <p>• 他のユーザーからの反応が見られます</p>
+                  <p>• 設定から各種機能を変更できます</p>
+                </div>
+                <div className="mt-4 p-3 bg-green-50 rounded-lg">
+                  <p className="text-sm">📍 <strong>重要：</strong> 場所を投稿していないとマッチングできません。まずは場所を投稿してみましょう！</p>
+                </div>
+              </div>
+            }
+            size="md"
+          />
+          <button
+            onClick={handleSettingsClick}
+            className="p-2 -mr-2"
+          >
+            <Cog6ToothIcon className="h-6 w-6 text-gray-600" />
+          </button>
+        </div>
       </div>
 
       {/* Profile Card */}
@@ -446,12 +552,24 @@ function ProfilePageContent() {
                 {activeTab === 'kept' && '📌'}
                 {activeTab === 'passed' && '❌'}
               </div>
-              <p className="text-gray-500">
+              <p className="text-gray-500 mb-4">
                 {activeTab === 'posted' && 'まだ投稿がありません'}
                 {activeTab === 'liked' && 'まだ行きたい場所がありません'}
                 {activeTab === 'kept' && 'まだキープした場所がありません'}
                 {activeTab === 'passed' && 'パスした場所はありません'}
               </p>
+              
+              {activeTab === 'posted' && (
+                <ContextHint type="info">
+                  <strong>場所を投稿</strong>してマッチングを始めましょう！投稿がないとマッチングできません。
+                </ContextHint>
+              )}
+              
+              {activeTab === 'liked' && (
+                <ContextHint type="tip">
+                  ホーム画面で気になる場所に<strong>「いいね」</strong>してみましょう
+                </ContextHint>
+              )}
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-4">

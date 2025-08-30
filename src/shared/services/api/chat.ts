@@ -256,6 +256,11 @@ export async function sendMessage(roomId: string, senderId: string, message: str
  */
 export async function createChatRoom(placeId: string, userA: string, userB: string): Promise<ChatRoom> {
   try {
+    // 自己チャット防止チェック
+    if (userA === userB) {
+      throw new Error('Cannot create chat room with the same user (self-chat prevention)');
+    }
+
     // 既存のチャットルームをチェック
     const { data: existingRoom } = await supabase
       .from('chat_rooms')

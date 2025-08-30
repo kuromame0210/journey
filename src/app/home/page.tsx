@@ -7,6 +7,8 @@ import BottomNavigation from '@/components/BottomNavigation'
 import ImageWithFallback from '@/components/ImageWithFallback'
 import { HeartIcon, BookmarkIcon, XMarkIcon } from '@heroicons/react/24/outline'
 import { useRouter } from 'next/navigation'
+import HelpIcon from '@/components/HelpIcon'
+import ContextHint from '@/components/ContextHint'
 
 /**
  * 共通化対応: Place型定義を統一型に移行
@@ -132,6 +134,11 @@ export default function HomePage() {
         }
       }
 
+      // 相互いいね判定とチャットルーム自動作成（typeが'like'の場合のみ）
+      if (type === 'like') {
+        await checkMutualLikeAndCreateChatRoom(currentPlace, user)
+      }
+
       // Move to next card regardless of error (UX priority)
       setCurrentIndex(prev => prev + 1)
     } catch (error) {
@@ -144,6 +151,82 @@ export default function HomePage() {
   const handleCardClick = () => {
     if (currentIndex < places.length) {
       router.push(`/place/${places[currentIndex].id}?from=home`)
+    }
+  }
+
+  /**
+   * 相互いいね判定とチャットルーム自動作成
+   */
+  const checkMutualLikeAndCreateChatRoom = async (place: { id: string; owner: string }, currentUser: { id: string; email?: string }) => {
+    try {
+      // 現在のユーザーの投稿を取得
+      const { data: currentUserPlaces, error: placesError } = await supabase
+        .from('places')
+        .select('id')
+        .eq('owner', currentUser.id)
+
+      if (placesError) {
+        console.error('Error fetching current user places:', placesError)
+        return
+      }
+
+      if (!currentUserPlaces || currentUserPlaces.length === 0) {
+        return // 現在のユーザーが投稿していない場合は相互いいね不可
+      }
+
+      // 投稿者が現在のユーザーの投稿にいいねしているかチェック
+      const { data: mutualReaction, error: mutualError } = await supabase
+        .from('reactions')
+        .select('*')
+        .eq('from_uid', place.owner)
+        .eq('type', 'like')
+        .in('place_id', currentUserPlaces.map(p => p.id))
+
+      if (mutualError) {
+        console.error('Error checking mutual reaction:', mutualError)
+        return
+      }
+
+      // 相互いいねが成立している場合
+      if (mutualReaction && mutualReaction.length > 0) {
+        console.log('Mutual like detected! Creating chat room...')
+        
+        // 既存のチャットルームをチェック（同じ場所・同じユーザーペア）
+        const { data: existingRoom, error: roomCheckError } = await supabase
+          .from('chat_rooms')
+          .select('id')
+          .eq('place_id', place.id)
+          .or(`and(user_a.eq.${currentUser.id},user_b.eq.${place.owner}),and(user_a.eq.${place.owner},user_b.eq.${currentUser.id})`)
+
+        if (roomCheckError) {
+          console.error('Error checking existing chat room:', roomCheckError)
+          return
+        }
+
+        // チャットルームが存在しない場合のみ作成
+        if (!existingRoom || existingRoom.length === 0) {
+          const { data: newRoom, error: createRoomError } = await supabase
+            .from('chat_rooms')
+            .insert({
+              place_id: place.id,
+              user_a: currentUser.id,
+              user_b: place.owner
+            })
+            .select()
+            .single()
+
+          if (createRoomError) {
+            console.error('Error creating chat room:', createRoomError)
+            return
+          }
+
+          console.log('Chat room created successfully:', newRoom.id)
+        } else {
+          console.log('Chat room already exists:', existingRoom[0].id)
+        }
+      }
+    } catch (error) {
+      console.error('Error in mutual like check:', error)
     }
   }
 
@@ -187,9 +270,29 @@ export default function HomePage() {
       {/* Header */}
       <div className="bg-white px-4 py-3 flex items-center justify-between shadow-sm">
         <h1 className="text-xl font-bold text-blue-600">Journey</h1>
-        <div className="text-sm text-gray-500">
-          {currentIndex + 1} / {places.length}
+        <div className="flex items-center space-x-3">
+          <div className="text-sm text-gray-500">
+            {currentIndex + 1} / {places.length}
+          </div>
         </div>
+        <HelpIcon
+          title="マッチングについて"
+          content={
+            <div className="space-y-3">
+              <p>🎯 <strong>マッチングの仕組み</strong></p>
+              <ol className="list-decimal list-inside space-y-2 text-sm">
+                <li>あなたが相手の場所に「いいね」</li>
+                <li>相手があなたの場所（どれでも）に「いいね」</li>
+                <li>お互いにいいねでマッチング成立！</li>
+                <li>自動でチャットルーム作成</li>
+              </ol>
+              <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                <p className="text-sm">💡 <strong>ポイント：</strong> 同じ場所である必要はありません。お互いの投稿にいいねすればマッチです！</p>
+              </div>
+            </div>
+          }
+          size="md"
+        />
       </div>
 
       {/* Card */}
@@ -268,6 +371,13 @@ export default function HomePage() {
           <span>興味ない</span>
           <span>キープ</span>
           <span>行きたい</span>
+        </div>
+        
+        {/* Context Hint */}
+        <div className="mt-4">
+          <ContextHint type="match">
+            <strong>いいね</strong>でマッチングのチャンス！お互いにいいねするとチャット開始
+          </ContextHint>
         </div>
       </div>
 
