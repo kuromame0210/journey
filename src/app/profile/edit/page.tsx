@@ -43,6 +43,8 @@ import {
   DEMAND_TAGS_FULL as DEMAND_TAGS,
   MBTI_TYPES
 } from '@/shared/constants'
+import { useImageCompression } from '@/shared/hooks/useImageCompression'
+import { formatFileSize } from '@/shared/utils/imageCompression'
 
 // 後方互換性のための型エイリアス
 // 元の実装: const budgetOptions = [{ id: 1, label: '低 (〜3万円)' }, ...]
@@ -78,6 +80,15 @@ export default function ProfileEditPage() {
   
   const [avatarFile, setAvatarFile] = useState<File | null>(null)
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
+  
+  // 画像圧縮機能
+  const { 
+    isCompressing, 
+    progress: compressionProgress, 
+    error: compressionError, 
+    compressSingleImage,
+    reset: resetCompression
+  } = useImageCompression()
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -152,7 +163,7 @@ export default function ProfileEditPage() {
   const handleInputChange = useInputChangeHandler(setFormData)
   const handleMultiSelectToggle = useArrayToggleHandler(setFormData)
 
-  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
       // Validate file type
@@ -163,7 +174,7 @@ export default function ProfileEditPage() {
         return
       }
       
-      // Validate file size (max 5MB)
+      // Validate file size (max 5MB before compression)
       if (file.size > 5 * 1024 * 1024) {
         // セキュリティ強化: alert()をshowWarning()に置き換え
         // 旧実装: alert('ファイルサイズは5MB以下にしてください')
@@ -171,20 +182,45 @@ export default function ProfileEditPage() {
         return
       }
       
-      setAvatarFile(file)
+      resetCompression()
       
-      // Create preview
-      const reader = new FileReader()
-      reader.onload = (e) => {
-        setAvatarPreview(e.target?.result as string)
+      try {
+        // 画像を圧縮
+        const compressionResult = await compressSingleImage(file, {
+          maxWidth: 800,  // アバターは小さくて良い
+          maxHeight: 800,
+          quality: 0.9,   // アバターは高品質を保つ
+          outputFormat: 'jpeg'
+        })
+        
+        if (compressionResult) {
+          // 圧縮結果をログ出力
+          console.log('Avatar compression:', {
+            originalSize: formatFileSize(compressionResult.originalSize),
+            compressedSize: formatFileSize(compressionResult.compressedSize),
+            ratio: `${compressionResult.compressionRatio}% reduced`
+          })
+          
+          setAvatarFile(compressionResult.file)
+          
+          // Create preview from compressed image
+          const reader = new FileReader()
+          reader.onload = (e) => {
+            setAvatarPreview(e.target?.result as string)
+          }
+          reader.readAsDataURL(compressionResult.file)
+        }
+      } catch (error) {
+        console.error('Avatar compression failed:', error)
+        const errorMessage = compressionError || '画像の処理に失敗しました'
+        handleError(error, errorMessage)
       }
-      reader.readAsDataURL(file)
     }
   }
 
   const uploadAvatar = async (file: File, userId: string): Promise<string | null> => {
     try {
-      const fileExt = file.name.split('.').pop()
+      const fileExt = 'jpg' // 圧縮後はJPEGに統一
       const fileName = `${userId}/avatar.${fileExt}`
       
       const { error } = await supabase.storage
@@ -328,6 +364,11 @@ export default function ProfileEditPage() {
             <div className="text-sm text-gray-600">
               <p>JPG、PNG形式 (最大5MB)</p>
               <p>正方形の画像が推奨です</p>
+              {isCompressing && (
+                <p className="text-blue-600 font-medium">
+                  圧縮中... {compressionProgress}%
+                </p>
+              )}
             </div>
           </div>
         </div>

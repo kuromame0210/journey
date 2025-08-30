@@ -47,6 +47,8 @@ import {
   PURPOSE_TAGS_BASIC as PURPOSE_TAGS,
   DEMAND_TAGS_BASIC as DEMAND_TAGS
 } from '@/shared/constants'
+import { useImageCompression } from '@/shared/hooks/useImageCompression'
+import { formatFileSize } from '@/shared/utils/imageCompression'
 
 // 後方互換性のための型エイリアス
 // 元の実装: const budgetOptions = [{ id: 1, label: '低 (〜3万円)' }, ...]
@@ -64,6 +66,15 @@ export default function PlaceCreatePage() {
   
   // セキュリティ強化: alert()をErrorToastに置き換え
   const { message, type, isVisible, handleError, clearMessage } = useErrorHandler()
+  
+  // 画像圧縮機能
+  const { 
+    isCompressing, 
+    progress: compressionProgress, 
+    error: compressionError, 
+    compressMultipleImages,
+    reset: resetCompression
+  } = useImageCompression()
   
   const [formData, setFormData] = useState({
     title: '',
@@ -122,15 +133,38 @@ export default function PlaceCreatePage() {
     if (!user) return
     
     setUploadingImages(true)
+    resetCompression()
     
     try {
-      const uploadPromises = files.map(async (file, index) => {
-        const fileExt = file.name.split('.').pop()
+      // 画像を圧縮
+      const compressionResults = await compressMultipleImages(files, {
+        maxWidth: 1920,
+        maxHeight: 1080,
+        quality: 0.8,
+        outputFormat: 'jpeg'
+      })
+      
+      if (compressionResults.length === 0) {
+        throw new Error('画像の圧縮に失敗しました')
+      }
+      
+      // 圧縮結果をログ出力（開発時の確認用）
+      compressionResults.forEach((result, index) => {
+        console.log(`Image ${index + 1} compression:`, {
+          originalSize: formatFileSize(result.originalSize),
+          compressedSize: formatFileSize(result.compressedSize),
+          ratio: `${result.compressionRatio}% reduced`
+        })
+      })
+      
+      // 圧縮された画像をアップロード
+      const uploadPromises = compressionResults.map(async (result, index) => {
+        const fileExt = 'jpg' // 圧縮後はJPEGに統一
         const fileName = `${user.id}/${Date.now()}-${index}.${fileExt}`
         
         const { error } = await supabase.storage
           .from('place-images')
-          .upload(fileName, file, {
+          .upload(fileName, result.file, {
             cacheControl: '3600',
             upsert: false
           })
@@ -146,12 +180,14 @@ export default function PlaceCreatePage() {
       
       const uploadedUrls = await Promise.all(uploadPromises)
       setImages(prev => [...prev, ...uploadedUrls])
-      setImageFiles(prev => [...prev, ...files])
+      setImageFiles(prev => [...prev, ...compressionResults.map(r => r.file)])
+      
     } catch (error) {
       console.error('Error uploading images:', error)
       // セキュリティ強化: 技術的詳細を隠したエラーメッセージ表示
       // 旧実装: alert('画像のアップロードに失敗しました')
-      handleError(error, '画像のアップロードに失敗しました')
+      const errorMessage = compressionError || '画像のアップロードに失敗しました'
+      handleError(error, errorMessage)
     } finally {
       setUploadingImages(false)
     }
@@ -262,11 +298,16 @@ export default function PlaceCreatePage() {
               <button
                 type="button"
                 onClick={handleImageAdd}
-                disabled={uploadingImages}
+                disabled={uploadingImages || isCompressing}
                 className="aspect-square border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center hover:border-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {uploadingImages ? (
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-400"></div>
+                {uploadingImages || isCompressing ? (
+                  <div className="flex flex-col items-center space-y-2">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-400"></div>
+                    <span className="text-xs text-gray-500">
+                      {isCompressing ? `圧縮中 ${compressionProgress}%` : 'アップロード中'}
+                    </span>
+                  </div>
                 ) : (
                   <PhotoIcon className="h-8 w-8 text-gray-400" />
                 )}

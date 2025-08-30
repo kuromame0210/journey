@@ -111,7 +111,8 @@ export async function fetchUserPlaces(userId: string, limit: number = 20): Promi
         title,
         images,
         genre,
-        created_at
+        created_at,
+        owner
       `)
       .eq('owner', userId)
       .order('created_at', { ascending: false })

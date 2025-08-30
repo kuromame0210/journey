@@ -113,6 +113,11 @@ export default function PlaceDetailPage() {
         }
       }
       
+      // 相互いいね判定とチャットルーム自動作成（typeが'like'の場合のみ）
+      if (type === 'like') {
+        await checkMutualLikeAndCreateChatRoom(place, user)
+      }
+      
       // Navigate back based on where user came from
       const fromParam = searchParams.get('from')
       const tabParam = searchParams.get('tab')
@@ -127,6 +132,95 @@ export default function PlaceDetailPage() {
       // セキュリティ強化: 技術的詳細を隠したエラーメッセージ表示
       // 旧実装: alert('エラーが発生しました')
       handleError(error, 'リアクションの保存に失敗しました')
+    }
+  }
+
+  /**
+   * 相互いいね判定とチャットルーム自動作成
+   */
+  const checkMutualLikeAndCreateChatRoom = async (place: Place, currentUser: { id: string; email?: string }) => {
+    try {
+      // 投稿者（place.owner）が現在のユーザー（currentUser.id）の投稿にlikeしているか確認
+      const { data: ownerReactions, error: ownerReactionError } = await supabase
+        .from('reactions')
+        .select('*')
+        .eq('from_uid', place.owner) // 投稿者が
+        .eq('type', 'like') // いいねした
+        .in('place_id', []) // この時点では空配列、次の処理で現在のユーザーの投稿IDを取得
+
+      if (ownerReactionError) {
+        console.error('Error checking owner reactions:', ownerReactionError)
+        return
+      }
+
+      // 現在のユーザーの投稿を取得
+      const { data: currentUserPlaces, error: placesError } = await supabase
+        .from('places')
+        .select('id')
+        .eq('owner', currentUser.id)
+
+      if (placesError) {
+        console.error('Error fetching current user places:', placesError)
+        return
+      }
+
+      // 投稿者が現在のユーザーの投稿にいいねしているかチェック
+      const { data: mutualReaction, error: mutualError } = await supabase
+        .from('reactions')
+        .select('*')
+        .eq('from_uid', place.owner)
+        .eq('type', 'like')
+        .in('place_id', currentUserPlaces.map(p => p.id))
+
+      if (mutualError) {
+        console.error('Error checking mutual reaction:', mutualError)
+        return
+      }
+
+      // 相互いいねが成立している場合
+      if (mutualReaction && mutualReaction.length > 0) {
+        console.log('Mutual like detected! Creating chat room...')
+        
+        // 既存のチャットルームをチェック（同じ場所・同じユーザーペア）
+        const { data: existingRoom, error: roomCheckError } = await supabase
+          .from('chat_rooms')
+          .select('id')
+          .eq('place_id', place.id)
+          .or(`and(user_a.eq.${currentUser.id},user_b.eq.${place.owner}),and(user_a.eq.${place.owner},user_b.eq.${currentUser.id})`)
+
+        if (roomCheckError) {
+          console.error('Error checking existing chat room:', roomCheckError)
+          return
+        }
+
+        // チャットルームが存在しない場合のみ作成
+        if (!existingRoom || existingRoom.length === 0) {
+          const { data: newRoom, error: createRoomError } = await supabase
+            .from('chat_rooms')
+            .insert({
+              place_id: place.id,
+              user_a: currentUser.id,
+              user_b: place.owner
+            })
+            .select()
+            .single()
+
+          if (createRoomError) {
+            console.error('Error creating chat room:', createRoomError)
+            return
+          }
+
+          console.log('Chat room created successfully:', newRoom.id)
+          
+          // 相互いいね成立通知（オプション - 必要に応じて実装）
+          // ここで通知機能を呼び出すことができます
+        } else {
+          console.log('Chat room already exists:', existingRoom[0].id)
+        }
+      }
+    } catch (error) {
+      console.error('Error in mutual like check:', error)
+      // エラーログは出すが、メインの処理は継続させる
     }
   }
 

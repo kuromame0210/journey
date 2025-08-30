@@ -193,6 +193,55 @@ export type Database = {
           label?: string
         }
       }
+      chat_rooms: {
+        Row: {
+          id: string
+          place_id: string
+          user_a: string
+          user_b: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          place_id: string
+          user_a: string
+          user_b: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          place_id?: string
+          user_a?: string
+          user_b?: string
+          created_at?: string
+        }
+      }
+      messages: {
+        Row: {
+          id: string
+          room_id: string
+          sender: string
+          body: string
+          sent_at: string
+          is_read: boolean
+        }
+        Insert: {
+          id?: string
+          room_id: string
+          sender: string
+          body: string
+          sent_at?: string
+          is_read?: boolean
+        }
+        Update: {
+          id?: string
+          room_id?: string
+          sender?: string
+          body?: string
+          sent_at?: string
+          is_read?: boolean
+        }
+      }
     }
   }
 }

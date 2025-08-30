@@ -39,3 +39,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# development and debugging files
+debug-database.js
+debug-*.js
+
+# claude settings (local only)
+.claude/settings.local.json

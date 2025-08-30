@@ -100,6 +100,7 @@ export interface ChatRoom {
  * 共通化の経緯:
  * - src/app/chat/[id]/page.tsx:12-18 の Message interface
  * - シンプルな構造なので、そのまま統一型として採用
+ * - is_readフィールドを追加（既読機能のため）
  */
 export interface Message {
   id: string;
@@ -107,6 +108,7 @@ export interface Message {
   sender: string;
   body: string;
   sent_at: string;
+  is_read?: boolean; // 既読フラグ（オプショナル - 既存データとの互換性のため）
 }
 
 /**
@@ -129,7 +131,7 @@ export interface Reaction {
 export type PlaceCard = Pick<Place, 'id' | 'title' | 'images' | 'genre' | 'purpose_tags' | 'demand_tags' | 'budget_option' | 'date_start' | 'date_end' | 'owner'>;
 
 // 元の実装: src/app/profile/page.tsx で使用されていたリスト表示用情報  
-export type PlaceListItem = Pick<Place, 'id' | 'title' | 'images' | 'genre' | 'created_at'>;
+export type PlaceListItem = Pick<Place, 'id' | 'title' | 'images' | 'genre' | 'created_at' | 'owner'>;
 
 // 元の実装: src/app/place/[id]/page.tsx で使用されていた詳細表示用（全情報）
 export type PlaceDetail = Place;
