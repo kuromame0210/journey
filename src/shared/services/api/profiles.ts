@@ -44,7 +44,7 @@ export async function fetchProfile(userId: string): Promise<Profile | null> {
 
     return data;
   } catch (error) {
-    console.error('Error fetching profile:', error);
+    console.error('プロフィールの取得エラー:', error);
     throw error;
   }
 }
@@ -75,7 +75,7 @@ export async function upsertProfile(userId: string, profileData: Partial<Profile
 
     return data;
   } catch (error) {
-    console.error('Error upserting profile:', error);
+    console.error('プロフィールの保存エラー:', error);
     throw error;
   }
 }
@@ -106,7 +106,7 @@ export async function checkProfileExists(userId: string): Promise<boolean> {
 
     return !!data;
   } catch (error) {
-    console.error('Error checking profile existence:', error);
+    console.error('プロフィール存在確認エラー:', error);
     return false; // エラー時はfalseを返す（安全側）
   }
 }
@@ -164,7 +164,7 @@ export async function fetchProfileStats(userId: string): Promise<ProfileStats> {
 
     return stats;
   } catch (error) {
-    console.error('Error fetching profile stats:', error);
+    console.error('プロフィール統計の取得エラー:', error);
     // エラー時はゼロ統計を返す
     return {
       postedCount: 0,

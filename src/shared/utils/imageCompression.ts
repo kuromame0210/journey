@@ -40,7 +40,7 @@ export const compressImage = async (
         const ctx = canvas.getContext('2d')
         
         if (!ctx) {
-          reject(new Error('Canvas context not supported'))
+          reject(new Error('キャンバスがサポートされていません'))
           return
         }
 
@@ -69,7 +69,7 @@ export const compressImage = async (
         canvas.toBlob(
           (blob) => {
             if (!blob) {
-              reject(new Error('Failed to compress image'))
+              reject(new Error('画像の圧縮に失敗しました'))
               return
             }
 
@@ -106,7 +106,7 @@ export const compressImage = async (
     }
 
     img.onerror = () => {
-      reject(new Error('Failed to load image'))
+      reject(new Error('画像の読み込みに失敗しました'))
     }
 
     // 画像を読み込み
@@ -190,7 +190,7 @@ async function compressWithLowerQuality(
       canvas.toBlob(
         (blob) => {
           if (!blob) {
-            reject(new Error('Failed to compress with lower quality'))
+            reject(new Error('低品質での圧縮に失敗しました'))
             return
           }
 
@@ -239,7 +239,7 @@ export const getImageInfo = (file: File): Promise<{ width: number; height: numbe
     }
 
     img.onerror = () => {
-      reject(new Error('Failed to load image info'))
+      reject(new Error('画像情報の読み込みに失敗しました'))
     }
 
     img.src = URL.createObjectURL(file)

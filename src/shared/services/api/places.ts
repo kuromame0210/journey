@@ -55,7 +55,7 @@ export async function fetchPlacesList(userId?: string, limit: number = 50): Prom
 
     return data || [];
   } catch (error) {
-    console.error('Error fetching places list:', error);
+    console.error('場所一覧の取得エラー:', error);
     throw error;
   }
 }
@@ -87,7 +87,7 @@ export async function fetchPlaceDetail(placeId: string): Promise<PlaceDetail | n
 
     return data;
   } catch (error) {
-    console.error('Error fetching place detail:', error);
+    console.error('場所詳細の取得エラー:', error);
     throw error;
   }
 }
@@ -124,7 +124,7 @@ export async function fetchUserPlaces(userId: string, limit: number = 20): Promi
 
     return data || [];
   } catch (error) {
-    console.error('Error fetching user places:', error);
+    console.error('ユーザー場所の取得エラー:', error);
     throw error;
   }
 }
@@ -178,7 +178,7 @@ export async function createPlace(
 
     return data;
   } catch (error) {
-    console.error('Error creating place:', error);
+    console.error('場所作成エラー:', error);
     throw error;
   }
 }
@@ -207,7 +207,7 @@ export async function updatePlace(placeId: string, placeData: Partial<Place>): P
 
     return data;
   } catch (error) {
-    console.error('Error updating place:', error);
+    console.error('場所更新エラー:', error);
     throw error;
   }
 }
@@ -236,7 +236,7 @@ export async function deletePlace(placeId: string, ownerId: string): Promise<voi
     }
 
     if (place.owner !== ownerId) {
-      throw new Error('Unauthorized: You can only delete your own places');
+      throw new Error('権限がありません：自分の投稿のみ削除できます');
     }
 
     // 削除実行
@@ -249,7 +249,7 @@ export async function deletePlace(placeId: string, ownerId: string): Promise<voi
       throw new Error(`Place deletion failed: ${deleteError.message}`);
     }
   } catch (error) {
-    console.error('Error deleting place:', error);
+    console.error('場所削除エラー:', error);
     throw error;
   }
 }
@@ -329,7 +329,7 @@ export async function searchPlaces(params: PlaceSearchParams): Promise<PlaceCard
 
     return data || [];
   } catch (error) {
-    console.error('Error searching places:', error);
+    console.error('場所検索エラー:', error);
     throw error;
   }
 }

@@ -72,7 +72,7 @@ export async function createReaction(
       return data;
     }
   } catch (error) {
-    console.error('Error creating/updating reaction:', error);
+    console.error('リアクション作成・更新エラー:', error);
     throw error;
   }
 }
@@ -98,7 +98,7 @@ export async function deleteReaction(placeId: string, fromUserId: string): Promi
       throw new Error(`Reaction deletion failed: ${error.message}`);
     }
   } catch (error) {
-    console.error('Error deleting reaction:', error);
+    console.error('リアクション削除エラー:', error);
     throw error;
   }
 }
@@ -131,7 +131,7 @@ export async function getUserReaction(placeId: string, userId: string): Promise<
 
     return data;
   } catch (error) {
-    console.error('Error fetching user reaction:', error);
+    console.error('ユーザーリアクションの取得エラー:', error);
     throw error;
   }
 }
@@ -181,7 +181,7 @@ export async function getReactionStats(placeId: string): Promise<ReactionStats> 
 
     return stats;
   } catch (error) {
-    console.error('Error fetching reaction stats:', error);
+    console.error('リアクション統計の取得エラー:', error);
     return {
       likeCount: 0,
       keepCount: 0,
@@ -226,7 +226,7 @@ export async function getUserReactions(
 
     return data || [];
   } catch (error) {
-    console.error('Error fetching user reactions:', error);
+    console.error('ユーザーリアクション一覧の取得エラー:', error);
     throw error;
   }
 }
@@ -258,7 +258,7 @@ export async function canCreateChatRoom(
     return reactorReaction?.type === 'like';
     
   } catch (error) {
-    console.error('Error checking chat room creation possibility:', error);
+    console.error('チャットルーム作成可否の確認エラー:', error);
     return false;
   }
 }
@@ -291,7 +291,7 @@ export async function handleReaction(
     
     return { reaction, canChat };
   } catch (error) {
-    console.error('Error handling reaction:', error);
+    console.error('リアクション処理エラー:', error);
     throw error;
   }
 }

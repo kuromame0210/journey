@@ -108,7 +108,7 @@ export async function fetchChatRoomsList(userId: string): Promise<ChatRoomListIt
 
     return roomsWithDetails;
   } catch (error) {
-    console.error('Error fetching chat rooms list:', error);
+    console.error('チャットルーム一覧の取得エラー:', error);
     throw error;
   }
 }
@@ -147,7 +147,7 @@ export async function fetchChatRoomDetail(roomId: string, userId: string): Promi
 
     // 権限確認：参加者でない場合はアクセス拒否
     if (room.user_a !== userId && room.user_b !== userId) {
-      throw new Error('Unauthorized: You are not a participant in this chat room');
+      throw new Error('権限がありません：あなたはこのチャットルームの参加者ではありません');
     }
 
     const otherUserId = room.user_a === userId ? room.user_b : room.user_a;
@@ -175,7 +175,7 @@ export async function fetchChatRoomDetail(roomId: string, userId: string): Promi
       }
     };
   } catch (error) {
-    console.error('Error fetching chat room detail:', error);
+    console.error('チャットルーム詳細の取得エラー:', error);
     throw error;
   }
 }
@@ -205,7 +205,7 @@ export async function fetchMessages(roomId: string, limit: number = 50): Promise
 
     return data || [];
   } catch (error) {
-    console.error('Error fetching messages:', error);
+    console.error('メッセージの取得エラー:', error);
     throw error;
   }
 }
@@ -240,7 +240,7 @@ export async function sendMessage(roomId: string, senderId: string, message: str
 
     return data;
   } catch (error) {
-    console.error('Error sending message:', error);
+    console.error('メッセージ送信エラー:', error);
     throw error;
   }
 }
@@ -293,7 +293,7 @@ export async function createChatRoom(placeId: string, userA: string, userB: stri
 
     return newRoom;
   } catch (error) {
-    console.error('Error creating chat room:', error);
+    console.error('チャットルーム作成エラー:', error);
     throw error;
   }
 }
@@ -317,7 +317,7 @@ export async function markMessagesAsRead(messageIds: string[]): Promise<void> {
       throw new Error(`Mark messages as read failed: ${error.message}`);
     }
   } catch (error) {
-    console.error('Error marking messages as read:', error);
+    console.error('メッセージ既読マークエラー:', error);
     throw error;
   }
 }
@@ -344,7 +344,7 @@ export async function markRoomMessagesAsRead(roomId: string, userId: string): Pr
       throw new Error(`Mark room messages as read failed: ${error.message}`);
     }
   } catch (error) {
-    console.error('Error marking room messages as read:', error);
+    console.error('ルームメッセージ既読マークエラー:', error);
     throw error;
   }
 }
@@ -373,7 +373,7 @@ export async function deleteChatRoom(roomId: string, userId: string): Promise<vo
     }
 
     if (room.user_a !== userId && room.user_b !== userId) {
-      throw new Error('Unauthorized: You can only delete chat rooms you participate in');
+      throw new Error('権限がありません：参加しているチャットルームのみ削除できます');
     }
 
     // 関連するメッセージを先に削除
@@ -396,7 +396,7 @@ export async function deleteChatRoom(roomId: string, userId: string): Promise<vo
       throw new Error(`Chat room deletion failed: ${roomDeleteError.message}`);
     }
   } catch (error) {
-    console.error('Error deleting chat room:', error);
+    console.error('チャットルーム削除エラー:', error);
     throw error;
   }
 }
