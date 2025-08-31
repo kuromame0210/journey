@@ -139,7 +139,7 @@ export default function AuthPage() {
 
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${typeof window !== 'undefined' ? window.location.origin : ''}/auth/reset-password`
+        redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000')}/auth/reset-password`
       })
       
       if (error) throw error
@@ -320,6 +320,8 @@ export default function AuthPage() {
             )}
           </form>
 
+          {/* Social login - 未実装のため一時的にコメントアウト */}
+          {/*
           <div className="relative">
             <div className="absolute inset-0 flex items-center">
               <div className="w-full border-t border-gray-300" />
@@ -343,6 +345,7 @@ export default function AuthPage() {
               LINE でサインイン
             </button>
           </div>
+          */}
         </div>
       ) : step === 'email_sent' ? (
         <div className="space-y-6">
